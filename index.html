@@ -83,7 +83,7 @@
 
   main { flex: 1; display: flex; min-height: 0; flex-direction: column; }
   
-  /* Map Container & Recenter Button */
+  /* Map Container & Zentrier-Button */
   #map-wrapper { position: relative; height: 35vh; width: 100%; }
   #map { height: 100%; width: 100%; background: #11161d; }
   #recenterBtn {
@@ -243,14 +243,14 @@ const CONFIG = {
   lat: 48.69,
   lon: 9.16,
   radiusKm: 20,
-  refreshSeconds: 15
+  refreshSeconds: 6 // Auf 6 Sekunden optimiert für ein flüssigeres Radar
 };
 
 const routeCache = new Map();
 const photoCache = new Map();
-const historyPositions = new Map(); // Für Flugspuren
-const polylines = new Map();        // Leaflet Polylines
-const alertedPlanes = new Set();    // Verhindert mehrfaches Gonganfragen
+const historyPositions = new Map(); 
+const polylines = new Map();        
+const alertedPlanes = new Set();    
 const errorLogs = [];
 let lastSuccessfulFlights = null;
 let consecutiveErrors = 0;
@@ -273,7 +273,6 @@ function setStatus(state, text) {
   if (t) t.textContent = text;
 }
 
-// Erzeugt einen dezenten Flugzeug-Lande-Gong via Web Audio API
 function playGong() {
   const toggle = document.getElementById('audioToggle');
   if (!toggle || !toggle.checked) return;
@@ -346,7 +345,6 @@ window.addEventListener('DOMContentLoaded', () => {
     logError("Karten-Initialisierungsfehler: " + e.message);
   }
 
-  // Event Listener für Zentrier-Button
   document.getElementById('recenterBtn').addEventListener('click', () => {
     if (map) map.setView([CONFIG.lat, CONFIG.lon], 10);
   });
@@ -469,7 +467,6 @@ function renderFlights(flights) {
       const icon = createPlaneIcon(f.track);
       const popupText = `<b>✈️ ${f.callsign || f.hex}</b><br>Höhe: ${f.altFt > 0 ? f.altFt + ' ft' : 'Boden'}<br>Geschw.: ${Math.round(f.speedKt * 1.852)} km/h`;
 
-      // Marker aktualisieren / erstellen
       if (markers.has(f.hex)) {
         const m = markers.get(f.hex);
         m.setLatLng([f.lat, f.lon]);
@@ -480,29 +477,39 @@ function renderFlights(flights) {
         markers.set(f.hex, m);
       }
 
-      // Flugspur (Flight Trail) verwalten
-      let path = historyPositions.get(f.hex) || [];
-      const lastPoint = path[path.length - 1];
-      if (!lastPoint || lastPoint[0] !== f.lat || lastPoint[1] !== f.lon) {
-        path.push([f.lat, f.lon]);
-        if (path.length > 15) path.shift();
-        historyPositions.set(f.hex, path);
-      }
+      // FLUGSPUR-LOGIK (Inklusive Löschung am Boden)
+      if (f.altFt === 0) {
+        // Am Boden: Spur entfernen, falls vorhanden
+        if (polylines.has(f.hex)) {
+          map.removeLayer(polylines.get(f.hex));
+          polylines.delete(f.hex);
+        }
+        historyPositions.delete(f.hex);
+      } else {
+        // In der Luft: Spur aufzeichnen & zeichnen
+        let path = historyPositions.get(f.hex) || [];
+        const lastPoint = path[path.length - 1];
+        if (!lastPoint || lastPoint[0] !== f.lat || lastPoint[1] !== f.lon) {
+          path.push([f.lat, f.lon]);
+          if (path.length > 15) path.shift();
+          historyPositions.set(f.hex, path);
+        }
 
-      if (polylines.has(f.hex)) {
-        polylines.get(f.hex).setLatLngs(path);
-      } else if (path.length > 1) {
-        const line = L.polyline(path, {
-          color: '#58a6ff',
-          weight: 2,
-          opacity: 0.5,
-          dashArray: '4, 4'
-        }).addTo(map);
-        polylines.set(f.hex, line);
+        if (polylines.has(f.hex)) {
+          polylines.get(f.hex).setLatLngs(path);
+        } else if (path.length > 1) {
+          const line = L.polyline(path, {
+            color: '#58a6ff',
+            weight: 2,
+            opacity: 0.5,
+            dashArray: '4, 4'
+          }).addTo(map);
+          polylines.set(f.hex, line);
+        }
       }
     }
 
-    // Verschwundene Flugzeuge & Flugspuren bereinigen
+    // Verschwundene Flugzeuge & Flugspuren aufräumen
     for (const [hex, m] of markers) {
       if (!seen.has(hex)) {
         map.removeLayer(m);
@@ -549,7 +556,7 @@ function renderFlights(flights) {
       <td>${f.distKm.toFixed(1)} km</td>
     `;
 
-    // Interaktive Verknüpfung: Klick auf Tabellenzeile zentriert Karte auf Maschine
+    // Interaktive Verknüpfung: Klick auf Zeile zentriert Karte
     tr.addEventListener('click', () => {
       if (map && markers.has(f.hex)) {
         const m = markers.get(f.hex);
@@ -582,7 +589,6 @@ function renderFlights(flights) {
           if (isLandingSTR) {
             if (rowElem) rowElem.classList.add('landing-str');
 
-            // Audio-Gong Trigger: Wenn Maschine nach Stuttgart fliegt, unter 5000 ft sinkt & noch kein Gong abgespielt wurde
             if (f.altFt > 0 && f.altFt < 5000 && !alertedPlanes.has(f.hex)) {
               alertedPlanes.add(f.hex);
               playGong();
