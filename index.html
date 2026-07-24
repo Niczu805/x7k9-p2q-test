@@ -47,9 +47,7 @@
     border-radius: 4px;
     transition: background-color 0.2s;
   }
-  .status-btn:hover {
-    background-color: #1c2229;
-  }
+  .status-btn:hover { background-color: #1c2229; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
   .dot.loading { background: #d29922; }
   .dot.error { background: #f85149; }
@@ -57,13 +55,25 @@
   #map { height: 35vh; width: 100%; background: #11161d; }
   #list { flex: 1; overflow-y: auto; background: #0d1117; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #1c2229; white-space: nowrap; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #1c2229; white-space: nowrap; vertical-align: middle; }
   th { position: sticky; top: 0; background: #11161d; color: #8b98a5; font-size: 11px; text-transform: uppercase; }
   tr:hover { background: #161b22; }
   .route { color: #58a6ff; }
   .route .arrow { color: #566270; margin: 0 4px; }
   .muted { color: #6e7681; }
   .empty { padding: 20px; text-align: center; color: #8b98a5; font-size: 13px; }
+
+  /* Styling für Karten-Icons und Flugzeugfotos */
+  .plane-marker { background: transparent !important; border: none !important; }
+  .plane-thumb {
+    width: 44px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+    display: block;
+    background: #161b22;
+  }
   
   /* Modal / Fehlerprotokoll-Fenster */
   .modal-backdrop {
@@ -135,6 +145,7 @@
       <thead>
         <tr>
           <th>Callsign</th>
+          <th>Foto</th>
           <th>Route</th>
           <th>Höhe</th>
           <th>Geschw.</th>
@@ -161,13 +172,14 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const CONFIG = {
-  lat: 48.6944,
-  lon: 9.1571,
+  lat: 48.69, // Auf 2 Nachkommastellen gerundet
+  lon: 9.16,  // Auf 2 Nachkommastellen gerundet
   radiusKm: 20,
   refreshSeconds: 15
 };
 
 const routeCache = new Map();
+const photoCache = new Map();
 const errorLogs = [];
 let lastSuccessfulFlights = null;
 let consecutiveErrors = 0;
@@ -210,6 +222,16 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+function createPlaneIcon(heading) {
+  const h = typeof heading === 'number' ? heading : 0;
+  return L.divIcon({
+    className: 'plane-marker',
+    html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="#58a6ff" style="transform: rotate(${h}deg); filter: drop-shadow(0 0 3px rgba(0,0,0,0.9)); display: block;"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+
 let map = null;
 const markers = new Map();
 
@@ -218,7 +240,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (window.L) {
       map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 10);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-      L.marker([CONFIG.lat, CONFIG.lon]).addTo(map).bindPopup('Standort LE');
+      L.marker([CONFIG.lat, CONFIG.lon]).addTo(map).bindPopup('Standort');
     }
   } catch(e) {
     logError("Karten-Initialisierungsfehler: " + e.message);
@@ -259,6 +281,26 @@ async function fetchRoute(callsign) {
   }
 }
 
+async function fetchPhoto(hex) {
+  if (!hex) return null;
+  if (photoCache.has(hex)) return photoCache.get(hex);
+  try {
+    const res = await fetch(`https://api.planespotters.net/pub/photos/hex/${hex}`);
+    if (!res.ok) { photoCache.set(hex, null); return null; }
+    const data = await res.json();
+    if (data && data.photos && data.photos.length > 0) {
+      const src = data.photos[0].thumbnail_large ? data.photos[0].thumbnail_large.src : data.photos[0].thumbnail.src;
+      photoCache.set(hex, src);
+      return src;
+    }
+    photoCache.set(hex, null);
+    return null;
+  } catch (e) {
+    photoCache.set(hex, null);
+    return null;
+  }
+}
+
 async function fetchAircraftData() {
   const latDelta = CONFIG.radiusKm / 111.0;
   const lonDelta = CONFIG.radiusKm / (111.0 * Math.cos(CONFIG.lat * Math.PI / 180));
@@ -279,18 +321,19 @@ async function fetchAircraftData() {
         lat: s[6],
         lon: s[5],
         alt_baro: typeof s[7] === 'number' ? Math.round(s[7] * 3.28084) : 0,
-        gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0
+        gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0,
+        track: typeof s[10] === 'number' ? Math.round(s[10]) : 0
       }))
     },
     {
       name: 'CodeTabs Proxy (ADSB.lol)',
       url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
-      parse: (d) => d.ac || []
+      parse: (d) => (d.ac || []).map(f => ({ ...f, track: f.track || f.nav_heading || 0 }))
     },
     {
       name: 'AllOrigins Proxy (ADSB.lol)',
       url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
-      parse: (d) => d.ac || []
+      parse: (d) => (d.ac || []).map(f => ({ ...f, track: f.track || f.nav_heading || 0 }))
     }
   ];
 
@@ -317,10 +360,13 @@ function renderFlights(flights) {
     const seen = new Set();
     for (const f of flights) {
       seen.add(f.hex);
+      const icon = createPlaneIcon(f.track);
       if (markers.has(f.hex)) {
-        markers.get(f.hex).setLatLng([f.lat, f.lon]);
+        const m = markers.get(f.hex);
+        m.setLatLng([f.lat, f.lon]);
+        m.setIcon(icon);
       } else {
-        const m = L.marker([f.lat, f.lon]).addTo(map);
+        const m = L.marker([f.lat, f.lon], { icon: icon }).addTo(map);
         markers.set(f.hex, m);
       }
     }
@@ -353,6 +399,7 @@ function renderFlights(flights) {
 
     tr.innerHTML = `
       <td>✈️ ${f.callsign || '<span class="muted">' + f.hex + '</span>'}</td>
+      <td id="photo-${f.hex}"><span class="muted">lade…</span></td>
       <td class="route" id="route-${f.hex}"><span class="muted">lade…</span></td>
       <td>${altFmt}</td>
       <td>${speedKm} km/h</td>
@@ -361,6 +408,18 @@ function renderFlights(flights) {
 
     tbody.appendChild(tr);
 
+    // Foto abrufen
+    fetchPhoto(f.hex).then(photoUrl => {
+      const cell = document.getElementById(`photo-${f.hex}`);
+      if (!cell) return;
+      if (photoUrl) {
+        cell.innerHTML = `<a href="${photoUrl}" target="_blank" rel="noopener"><img src="${photoUrl}" alt="Flugzeug" class="plane-thumb" /></a>`;
+      } else {
+        cell.innerHTML = '<span class="muted">–</span>';
+      }
+    });
+
+    // Route abrufen
     if (f.callsign) {
       fetchRoute(f.callsign).then(route => {
         const cell = document.getElementById(`route-${f.hex}`);
@@ -389,7 +448,6 @@ async function refresh() {
     consecutiveErrors++;
     logError(`Fehler bei Abrufversuch ${consecutiveErrors}: ${e.message}`);
     
-    // Falls vorübergehende Störung: Daten gepuffert anzeigen statt sofort abzubrechen
     if (lastSuccessfulFlights && consecutiveErrors < 3) {
       setStatus('loading', `Puffere Daten (${consecutiveErrors}/3)…`);
       renderFlights(lastSuccessfulFlights);
@@ -411,6 +469,7 @@ async function refresh() {
         lon: f.lon,
         altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
         speedKt: typeof f.gs === 'number' ? f.gs : 0,
+        track: typeof f.track === 'number' ? f.track : 0,
         distKm: dist
       };
     })
