@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Flugtracker – Leinfelden-Echterdingen</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0b0f14;
+    color: #e6edf3;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #11161d;
+    border-bottom: 1px solid #232b35;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .status { font-size: 11px; color: #8b98a5; display: flex; gap: 8px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
+  .dot.loading { background: #d29922; }
+  .dot.error { background: #f85149; }
+  main { flex: 1; display: flex; min-height: 0; flex-direction: column; }
+  #map { height: 35vh; width: 100%; background: #11161d; }
+  #list { flex: 1; overflow-y: auto; background: #0d1117; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #1c2229; white-space: nowrap; }
+  th { position: sticky; top: 0; background: #11161d; color: #8b98a5; font-size: 11px; text-transform: uppercase; }
+  tr:hover { background: #161b22; }
+  .route { color: #58a6ff; }
+  .route .arrow { color: #566270; margin: 0 4px; }
+  .muted { color: #6e7681; }
+  .empty { padding: 20px; text-align: center; color: #8b98a5; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✈️ LE Radar (HTML)</h1>
+  <div class="status">
+    <span><span class="dot" id="statusDot"></span><span id="statusText">Lade…</span></span>
+    <span id="countText">0 Flugzeuge</span>
+  </div>
+</header>
+
+<main>
+  <div id="map"></div>
+  <div id="list">
+    <table>
+      <thead>
+        <tr>
+          <th>Callsign</th>
+          <th>Route</th>
+          <th>Höhe</th>
+          <th>Geschw.</th>
+          <th>Distanz</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg">Suche nach Live-Flugdaten...</div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const CONFIG = {
+  lat: 48.6944,
+  lon: 9.1571,
+  radiusNmi: 20,
+  refreshSeconds: 10
+};
+
+const routeCache = new Map();
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+let map = null;
+const markers = new Map();
+
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    if (window.L) {
+      map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 10);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+      L.marker([CONFIG.lat, CONFIG.lon]).addTo(map).bindPopup('Standort LE');
+    }
+  } catch(e) {
+    console.warn("Karten-Fehler:", e);
+  }
+  
+  refresh();
+  setInterval(refresh, CONFIG.refreshSeconds * 1000);
+});
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const t = document.getElementById('statusText');
+  if (dot) dot.className = 'dot' + (state === 'ok' ? '' : ' ' + state);
+  if (t) t.textContent = text;
+}
+
+async function fetchRoute(callsign) {
+  const cs = callsign.trim();
+  if (!cs) return null;
+  if (routeCache.has(cs)) return routeCache.get(cs);
+  try {
+    const res = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);
+    if (!res.ok) { routeCache.set(cs, null); return null; }
+    const data = await res.json();
+    const fr = data && data.response && data.response.flightroute;
+    if (!fr) { routeCache.set(cs, null); return null; }
+    const result = {
+      origin: fr.origin ? (fr.origin.iata_code || fr.origin.icao_code) : null,
+      destination: fr.destination ? (fr.destination.iata_code || fr.destination.icao_code) : null
+    };
+    routeCache.set(cs, result);
+    return result;
+  } catch (e) {
+    routeCache.set(cs, null);
+    return null;
+  }
+}
+
+async function refresh() {
+  setStatus('loading', 'Lade Daten…');
+  
+  const apiUrl = `https://api.adsb.lol/v2/lat/${CONFIG.lat}/lon/${CONFIG.lon}/dist/${CONFIG.radiusNmi}`;
+
+  try {
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('HTTP status ' + res.status);
+    const data = await res.json();
+    const acList = data.ac || [];
+
+    const flights = acList
+      .filter(f => f && typeof f.lat === 'number' && typeof f.lon === 'number')
+      .map(f => {
+        const dist = haversineKm(CONFIG.lat, CONFIG.lon, f.lat, f.lon);
+        return {
+          hex: f.hex,
+          callsign: (f.flight || '').trim(),
+          lat: f.lat,
+          lon: f.lon,
+          altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
+          speedKt: typeof f.gs === 'number' ? f.gs : 0,
+          distKm: dist
+        };
+      })
+      .sort((a, b) => a.distKm - b.distKm);
+
+    if (map) {
+      const seen = new Set();
+      for (const f of flights) {
+        seen.add(f.hex);
+        if (markers.has(f.hex)) {
+          markers.get(f.hex).setLatLng([f.lat, f.lon]);
+        } else {
+          const m = L.marker([f.lat, f.lon]).addTo(map);
+          markers.set(f.hex, m);
+        }
+      }
+      for (const [hex, m] of markers) {
+        if (!seen.has(hex)) { map.removeLayer(m); markers.delete(hex); }
+      }
+    }
+
+    const tbody = document.getElementById('tbody');
+    const emptyMsg = document.getElementById('emptyMsg');
+    if (tbody) tbody.innerHTML = '';
+    
+    if (emptyMsg) {
+      if (flights.length === 0) {
+        emptyMsg.style.display = 'block';
+        emptyMsg.textContent = 'Kein Flugverkehr im Umkreis erfasst.';
+      } else {
+        emptyMsg.style.display = 'none';
+      }
+    }
+
+    const countElem = document.getElementById('countText');
+    if (countElem) countElem.textContent = `${flights.length} Flugzeuge`;
+
+    for (const f of flights) {
+      if (!tbody) break;
+      const tr = document.createElement('tr');
+      const speedKm = Math.round(f.speedKt * 1.852);
+      const altFmt = f.altFt > 0 ? `${f.altFt.toLocaleString('de-DE')} ft` : 'Boden';
+
+      tr.innerHTML = `
+        <td>✈️ ${f.callsign || '<span class="muted">' + f.hex + '</span>'}</td>
+        <td class="route" id="route-${f.hex}"><span class="muted">lade…</span></td>
+        <td>${altFmt}</td>
+        <td>${speedKm} km/h</td>
+        <td>${f.distKm.Test ? '' : f.distKm.toFixed(1)} km</td>
+      `;
+      // Korrektur für saubere Distanz-Anzeige im Loop:
+      tr.cells[4].textContent = `${f.distKm.toFixed(1)} km`;
+
+      tbody.appendChild(tr);
+
+      if (f.callsign) {
+        fetchRoute(f.callsign).then(route => {
+          const cell = document.getElementById(`route-${f.hex}`);
+          if (!cell) return;
+          if (route && route.origin && route.destination) {
+            cell.innerHTML = `${route.origin}<span class="arrow">→</span>${route.destination}`;
+          } else {
+            cell.innerHTML = '<span class="muted">k.A.</span>';
+          }
+        });
+      } else {
+        const cell = document.getElementById(`route-${f.hex}`);
+        if (cell) cell.innerHTML = '<span class="muted">–</span>';
+      }
+    }
+
+    setStatus('ok', 'Live: ' + new Date().toLocaleTimeString('de-DE'));
+
+  } catch (e) {
+    console.error("Fetch Fehler:", e);
+    setStatus('error', 'Verbindungsfehler');
+  }
+}
+</script>
+</body>
+</html>
