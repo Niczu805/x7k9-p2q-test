@@ -28,46 +28,20 @@
     gap: 12px;
   }
   header h1 { font-size: 15px; margin: 0; font-weight: 600; }
-  header .controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  header .status { 
-    font-size: 11px; 
-    color: #8b98a5; 
-    display: flex; 
-    gap: 8px; 
-    align-items: center; 
-  }
+  header .controls { display: flex; align-items: center; gap: 12px; }
+  header .status { font-size: 11px; color: #8b98a5; display: flex; gap: 8px; align-items: center; }
+  
   .status-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: transparent;
-    border: none;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent; border: none; color: inherit; font: inherit;
+    cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background-color 0.2s;
   }
   .status-btn:hover { background-color: #1c2229; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
   .dot.loading { background: #d29922; }
   .dot.error { background: #f85149; }
 
-  /* Audio-Toggle Switch */
-  .audio-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: #8b98a5;
-    cursor: pointer;
-    user-select: none;
-  }
+  .audio-toggle { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b98a5; cursor: pointer; user-select: none; }
   .switch { position: relative; display: inline-block; width: 32px; height: 18px; }
   .switch input { opacity: 0; width: 0; height: 0; }
   .slider {
@@ -82,28 +56,15 @@
   input:checked + .slider:before { transform: translateX(14px); background-color: #fff; }
 
   main { flex: 1; display: flex; min-height: 0; flex-direction: column; }
-  
-  /* Map Container & Zentrier-Button */
   #map-wrapper { position: relative; height: 35vh; width: 100%; }
   #map { height: 100%; width: 100%; background: #11161d; }
+  
   #recenterBtn {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    z-index: 1000;
-    background: #161b22;
-    border: 1px solid #30363d;
-    color: #e6edf3;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    transition: background 0.2s;
+    position: absolute; bottom: 12px; right: 12px; z-index: 1000;
+    background: #161b22; border: 1px solid #30363d; color: #e6edf3;
+    padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    display: flex; align-items: center; gap: 4px; transition: background 0.2s;
   }
   #recenterBtn:hover { background: #21262d; }
 
@@ -113,7 +74,6 @@
   th { position: sticky; top: 0; background: #11161d; color: #8b98a5; font-size: 11px; text-transform: uppercase; z-index: 10; }
   tr { transition: background-color 0.2s; cursor: pointer; }
   tr:hover { background: #161b22; }
-  
   tr.landing-str { background: #14202e; }
   tr.landing-str:hover { background: #1a2a3d; }
 
@@ -124,61 +84,26 @@
 
   .plane-marker { background: transparent !important; border: none !important; }
   .plane-thumb {
-    width: 44px;
-    height: 30px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #30363d;
-    display: block;
-    background: #161b22;
+    width: 44px; height: 30px; object-fit: cover; border-radius: 4px;
+    border: 1px solid #30363d; display: block; background: #161b22;
   }
-  
+
   .modal-backdrop {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 9999; align-items: center; justify-content: center; padding: 16px;
   }
   .modal-backdrop.active { display: flex; }
   .modal {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    max-width: 600px;
-    width: 100%;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    max-width: 600px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   }
-  .modal-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid #21262d;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+  .modal-header { padding: 12px 16px; border-bottom: 1px solid #21262d; display: flex; justify-content: space-between; align-items: center; }
   .modal-header h3 { font-size: 14px; color: #f0f6fc; }
-  .modal-close {
-    background: transparent;
-    border: none;
-    color: #8b98a5;
-    font-size: 18px;
-    cursor: pointer;
-  }
+  .modal-close { background: transparent; border: none; color: #8b98a5; font-size: 18px; cursor: pointer; }
   .modal-body {
-    padding: 16px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 11px;
-    color: #f85149;
-    white-space: pre-wrap;
-    word-break: break-all;
-    background: #0d1117;
+    padding: 16px; overflow-y: auto; font-family: monospace; font-size: 11px;
+    color: #f85149; white-space: pre-wrap; word-break: break-all; background: #0d1117;
   }
 </style>
 </head>
@@ -243,25 +168,30 @@ const CONFIG = {
   lat: 48.69,
   lon: 9.16,
   radiusKm: 20,
-  refreshSeconds: 6 // Auf 6 Sekunden optimiert für ein flüssigeres Radar
+  refreshSeconds: 5,
+  
+  // 🔑 HIER OPENSKY LOGINDATEN EINTRAGEN:
+  openskyUser: "DEIN_USERNAME",
+  openskyPass: "DEIN_PASSWORT"
 };
 
 const routeCache = new Map();
 const photoCache = new Map();
-const historyPositions = new Map(); 
+const historyPositions = new Map();
 const polylines = new Map();        
+const planeStates = new Map();      
 const alertedPlanes = new Set();    
 const errorLogs = [];
 let lastSuccessfulFlights = null;
 let consecutiveErrors = 0;
 let audioCtx = null;
+let map = null;
+const markers = new Map();
 
 function logError(msg) {
   const timestamp = new Date().toLocaleTimeString('de-DE');
-  const entry = `[${timestamp}] ${msg}`;
-  errorLogs.unshift(entry);
+  errorLogs.unshift(`[${timestamp}] ${msg}`);
   if (errorLogs.length > 20) errorLogs.pop();
-  
   const logElem = document.getElementById('errorLog');
   if (logElem) logElem.textContent = errorLogs.join('\n\n');
 }
@@ -276,41 +206,27 @@ function setStatus(state, text) {
 function playGong() {
   const toggle = document.getElementById('audioToggle');
   if (!toggle || !toggle.checked) return;
-
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-    osc.frequency.exponentialRampToValueAtTime(293.66, audioCtx.currentTime + 1.2); // D4
-
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(293.66, audioCtx.currentTime + 1.2);
     gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
-
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-
     osc.start();
     osc.stop(audioCtx.currentTime + 1.2);
-  } catch (e) {
-    logError("Audio-Wiedergabefehler: " + e.message);
-  }
+  } catch (e) { logError("Audio-Wiedergabefehler: " + e.message); }
 }
 
-document.getElementById('statusBtn').addEventListener('click', () => {
-  document.getElementById('errorModal').classList.add('active');
-});
-document.getElementById('modalCloseBtn').addEventListener('click', () => {
-  document.getElementById('errorModal').classList.remove('active');
-});
+document.getElementById('statusBtn').addEventListener('click', () => document.getElementById('errorModal').classList.add('active'));
+document.getElementById('modalCloseBtn').addEventListener('click', () => document.getElementById('errorModal').classList.remove('active'));
 document.getElementById('errorModal').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('errorModal')) {
-    document.getElementById('errorModal').classList.remove('active');
-  }
+  if (e.target === document.getElementById('errorModal')) document.getElementById('errorModal').classList.remove('active');
 });
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -331,8 +247,57 @@ function createPlaneIcon(heading) {
   });
 }
 
-let map = null;
-const markers = new Map();
+// -------------------------------------------------------------
+// INTERPOLATION & GLIDE ANIMATION LOOP (60 FPS)
+// -------------------------------------------------------------
+function animateLoop() {
+  const now = performance.now();
+
+  for (const [hex, state] of planeStates) {
+    if (state.altFt === 0) continue; // Am Boden nicht animieren
+
+    const elapsed = now - state.startTime;
+    const progress = Math.min(elapsed / state.duration, 1.0);
+
+    let trackDiff = (state.targetTrack - state.startTrack + 540) % 360 - 180;
+    const currentTrack = state.startTrack + trackDiff * progress;
+
+    const currentLat = state.startLat + (state.targetLat - state.startLat) * progress;
+    const currentLon = state.startLon + (state.targetLon - state.startLon) * progress;
+
+    if (markers.has(hex)) {
+      const m = markers.get(hex);
+      m.setLatLng([currentLat, currentLon]);
+      m.setIcon(createPlaneIcon(currentTrack));
+    }
+
+    const baseTrail = historyPositions.get(hex) || [];
+    if (baseTrail.length > 0) {
+      const dynamicTrail = [...baseTrail, [currentLat, currentLon]];
+      if (polylines.has(hex)) {
+        polylines.get(hex).setLatLngs(dynamicTrail);
+      } else {
+        const line = L.polyline(dynamicTrail, {
+          color: '#58a6ff',
+          weight: 2,
+          opacity: 0.6,
+          dashArray: '4, 4'
+        }).addTo(map);
+        polylines.set(hex, line);
+      }
+    }
+  }
+
+  requestAnimationFrame(animateLoop);
+}
+
+// TAB-VISIBILITY EVENT LISTENER (Sofort-Update bei Rückkehr)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    setStatus('loading', 'Aktualisiere Live-Daten…');
+    refresh();
+  }
+});
 
 window.addEventListener('DOMContentLoaded', () => {
   try {
@@ -341,9 +306,7 @@ window.addEventListener('DOMContentLoaded', () => {
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
       L.marker([CONFIG.lat, CONFIG.lon]).addTo(map).bindPopup('Standort');
     }
-  } catch(e) {
-    logError("Karten-Initialisierungsfehler: " + e.message);
-  }
+  } catch(e) { logError("Karten-Initialisierungsfehler: " + e.message); }
 
   document.getElementById('recenterBtn').addEventListener('click', () => {
     if (map) map.setView([CONFIG.lat, CONFIG.lon], 10);
@@ -351,6 +314,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   refresh();
   setInterval(refresh, CONFIG.refreshSeconds * 1000);
+  requestAnimationFrame(animateLoop);
 });
 
 async function fetchRoute(callsign) {
@@ -368,8 +332,7 @@ async function fetchRoute(callsign) {
       if (!ap) return null;
       const code = ap.iata_code || ap.icao_code || '';
       const city = ap.municipality || ap.name || '';
-      if (code && city) return `${code} (${city})`;
-      return code || city || null;
+      return (code && city) ? `${code} (${city})` : (code || city || null);
     };
 
     const result = {
@@ -408,22 +371,25 @@ async function fetchPhoto(hex) {
 async function fetchAircraftData() {
   const latDelta = CONFIG.radiusKm / 111.0;
   const lonDelta = CONFIG.radiusKm / (111.0 * Math.cos(CONFIG.lat * Math.PI / 180));
-
   const latMin = (CONFIG.lat - latDelta).toFixed(4);
   const latMax = (CONFIG.lat + latDelta).toFixed(4);
   const lonMin = (CONFIG.lon - lonDelta).toFixed(4);
   const lonMax = (CONFIG.lon + lonDelta).toFixed(4);
   const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
 
+  // Auth Header zusammenbauen (falls Credentials angegeben wurden)
+  const headers = {};
+  if (CONFIG.openskyUser && CONFIG.openskyPass && CONFIG.openskyUser !== "DEIN_USERNAME") {
+    headers['Authorization'] = 'Basic ' + btoa(CONFIG.openskyUser + ':' + CONFIG.openskyPass);
+  }
+
   const sources = [
     {
-      name: 'OpenSky Direct',
+      name: 'OpenSky Direct (mit Auth)',
       url: `https://opensky-network.org/api/states/all?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`,
+      headers: headers,
       parse: (d) => (d.states || []).map(s => ({
-        hex: s[0],
-        flight: s[1] ? s[1].trim() : '',
-        lat: s[6],
-        lon: s[5],
+        hex: s[0], flight: s[1] ? s[1].trim() : '', lat: s[6], lon: s[5],
         alt_baro: typeof s[7] === 'number' ? Math.round(s[7] * 3.28084) : 0,
         gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0,
         track: typeof s[10] === 'number' ? Math.round(s[10]) : 0
@@ -443,7 +409,7 @@ async function fetchAircraftData() {
 
   for (const src of sources) {
     try {
-      const res = await fetch(src.url);
+      const res = await fetch(src.url, { headers: src.headers || {} });
       if (res.ok) {
         const data = await res.json();
         const parsed = src.parse(data);
@@ -451,65 +417,66 @@ async function fetchAircraftData() {
       } else {
         logError(`${src.name} HTTP Status: ${res.status}`);
       }
-    } catch (e) {
-      logError(`${src.name} Netzwerkfehler: ${e.message}`);
-    }
+    } catch (e) { logError(`${src.name}: ${e.message}`); }
   }
-
-  throw new Error("Alle Datenquellen temporär unerreichbar.");
+  throw new Error("Fehler beim Abrufen der Flugdaten.");
 }
 
 function renderFlights(flights) {
   if (map) {
     const seen = new Set();
+    const now = performance.now();
+    const duration = CONFIG.refreshSeconds * 1000;
+
     for (const f of flights) {
       seen.add(f.hex);
-      const icon = createPlaneIcon(f.track);
       const popupText = `<b>✈️ ${f.callsign || f.hex}</b><br>Höhe: ${f.altFt > 0 ? f.altFt + ' ft' : 'Boden'}<br>Geschw.: ${Math.round(f.speedKt * 1.852)} km/h`;
 
-      if (markers.has(f.hex)) {
-        const m = markers.get(f.hex);
-        m.setLatLng([f.lat, f.lon]);
-        m.setIcon(icon);
-        m.setPopupContent(popupText);
-      } else {
-        const m = L.marker([f.lat, f.lon], { icon: icon }).addTo(map).bindPopup(popupText);
+      if (!markers.has(f.hex)) {
+        const m = L.marker([f.lat, f.lon], { icon: createPlaneIcon(f.track) }).addTo(map).bindPopup(popupText);
         markers.set(f.hex, m);
+      } else {
+        markers.get(f.hex).setPopupContent(popupText);
       }
 
-      // FLUGSPUR-LOGIK (Inklusive Löschung am Boden)
+      const existingState = planeStates.get(f.hex);
+      if (existingState) {
+        planeStates.set(f.hex, {
+          startLat: existingState.targetLat,
+          startLon: existingState.targetLon,
+          startTrack: existingState.targetTrack,
+          targetLat: f.lat,
+          targetLon: f.lon,
+          targetTrack: f.track,
+          startTime: now,
+          duration: duration,
+          altFt: f.altFt
+        });
+      } else {
+        planeStates.set(f.hex, {
+          startLat: f.lat, startLon: f.lon, startTrack: f.track,
+          targetLat: f.lat, targetLon: f.lon, targetTrack: f.track,
+          startTime: now, duration: duration, altFt: f.altFt
+        });
+      }
+
       if (f.altFt === 0) {
-        // Am Boden: Spur entfernen, falls vorhanden
         if (polylines.has(f.hex)) {
           map.removeLayer(polylines.get(f.hex));
           polylines.delete(f.hex);
         }
         historyPositions.delete(f.hex);
       } else {
-        // In der Luft: Spur aufzeichnen & zeichnen
         let path = historyPositions.get(f.hex) || [];
         const lastPoint = path[path.length - 1];
         if (!lastPoint || lastPoint[0] !== f.lat || lastPoint[1] !== f.lon) {
           path.push([f.lat, f.lon]);
-          if (path.length > 15) path.shift();
+          if (path.length > 20) path.shift();
           historyPositions.set(f.hex, path);
-        }
-
-        if (polylines.has(f.hex)) {
-          polylines.get(f.hex).setLatLngs(path);
-        } else if (path.length > 1) {
-          const line = L.polyline(path, {
-            color: '#58a6ff',
-            weight: 2,
-            opacity: 0.5,
-            dashArray: '4, 4'
-          }).addTo(map);
-          polylines.set(f.hex, line);
         }
       }
     }
 
-    // Verschwundene Flugzeuge & Flugspuren aufräumen
     for (const [hex, m] of markers) {
       if (!seen.has(hex)) {
         map.removeLayer(m);
@@ -519,6 +486,7 @@ function renderFlights(flights) {
           polylines.delete(hex);
         }
         historyPositions.delete(hex);
+        planeStates.delete(hex);
         alertedPlanes.delete(hex);
       }
     }
@@ -529,12 +497,8 @@ function renderFlights(flights) {
   if (tbody) tbody.innerHTML = '';
   
   if (emptyMsg) {
-    if (flights.length === 0) {
-      emptyMsg.style.display = 'block';
-      emptyMsg.textContent = 'Kein Flugverkehr im Umkreis erfasst.';
-    } else {
-      emptyMsg.style.display = 'none';
-    }
+    emptyMsg.style.display = flights.length === 0 ? 'block' : 'none';
+    if (flights.length === 0) emptyMsg.textContent = 'Kein Flugverkehr im Umkreis erfasst.';
   }
 
   const countElem = document.getElementById('countText');
@@ -556,12 +520,13 @@ function renderFlights(flights) {
       <td>${f.distKm.toFixed(1)} km</td>
     `;
 
-    // Interaktive Verknüpfung: Klick auf Zeile zentriert Karte
     tr.addEventListener('click', () => {
       if (map && markers.has(f.hex)) {
-        const m = markers.get(f.hex);
-        map.setView([f.lat, f.lon], 12);
-        m.openPopup();
+        const state = planeStates.get(f.hex);
+        const lat = state ? state.targetLat : f.lat;
+        const lon = state ? state.targetLon : f.lon;
+        map.setView([lat, lon], 12);
+        markers.get(f.hex).openPopup();
       }
     });
 
@@ -570,11 +535,7 @@ function renderFlights(flights) {
     fetchPhoto(f.hex).then(photoUrl => {
       const cell = document.getElementById(`photo-${f.hex}`);
       if (!cell) return;
-      if (photoUrl) {
-        cell.innerHTML = `<a href="${photoUrl}" target="_blank" rel="noopener"><img src="${photoUrl}" alt="Flugzeug" class="plane-thumb" /></a>`;
-      } else {
-        cell.innerHTML = '<span class="muted">–</span>';
-      }
+      cell.innerHTML = photoUrl ? `<a href="${photoUrl}" target="_blank" rel="noopener"><img src="${photoUrl}" alt="Flugzeug" class="plane-thumb" /></a>` : '<span class="muted">–</span>';
     });
 
     if (f.callsign) {
@@ -588,7 +549,6 @@ function renderFlights(flights) {
           const isLandingSTR = route.destCode === 'STR' || (route.destination && route.destination.includes('STR'));
           if (isLandingSTR) {
             if (rowElem) rowElem.classList.add('landing-str');
-
             if (f.altFt > 0 && f.altFt < 5000 && !alertedPlanes.has(f.hex)) {
               alertedPlanes.add(f.hex);
               playGong();
@@ -606,41 +566,39 @@ function renderFlights(flights) {
 }
 
 async function refresh() {
-  setStatus('loading', 'Lade Daten…');
+  // PAUSE FÜR HINTERGRUND-TABS:
+  if (document.hidden) return;
 
+  setStatus('loading', 'Lade Daten…');
   let acList = null;
   try {
     acList = await fetchAircraftData();
     consecutiveErrors = 0;
   } catch (e) {
     consecutiveErrors++;
-    logError(`Fehler bei Abrufversuch ${consecutiveErrors}: ${e.message}`);
-    
+    logError(`Fehler bei Abruf: ${e.message}`);
     if (lastSuccessfulFlights && consecutiveErrors < 3) {
       setStatus('loading', `Puffere Daten (${consecutiveErrors}/3)…`);
       renderFlights(lastSuccessfulFlights);
       return;
     } else {
-      setStatus('error', 'Verbindungsfehler (Klick für Info)');
+      setStatus('error', 'Verbindungsfehler');
       return;
     }
   }
 
   const flights = acList
     .filter(f => f && typeof f.lat === 'number' && typeof f.lon === 'number')
-    .map(f => {
-      const dist = haversineKm(CONFIG.lat, CONFIG.lon, f.lat, f.lon);
-      return {
-        hex: f.hex,
-        callsign: (f.flight || '').trim(),
-        lat: f.lat,
-        lon: f.lon,
-        altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
-        speedKt: typeof f.gs === 'number' ? f.gs : 0,
-        track: typeof f.track === 'number' ? f.track : 0,
-        distKm: dist
-      };
-    })
+    .map(f => ({
+      hex: f.hex,
+      callsign: (f.flight || '').trim(),
+      lat: f.lat,
+      lon: f.lon,
+      altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
+      speedKt: typeof f.gs === 'number' ? f.gs : 0,
+      track: typeof f.track === 'number' ? f.track : 0,
+      distKm: haversineKm(CONFIG.lat, CONFIG.lon, f.lat, f.lon)
+    }))
     .filter(f => f.distKm <= CONFIG.radiusKm)
     .sort((a, b) => a.distKm - b.distKm);
 
