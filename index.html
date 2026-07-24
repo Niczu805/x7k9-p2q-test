@@ -47,7 +47,7 @@
 <body>
 
 <header>
-  <h1>✈️ LE Radar (HTML)</h1>
+  <h1>✈️ LE Radar (Live)</h1>
   <div class="status">
     <span><span class="dot" id="statusDot"></span><span id="statusText">Lade…</span></span>
     <span id="countText">0 Flugzeuge</span>
@@ -78,7 +78,7 @@
 const CONFIG = {
   lat: 48.6944,
   lon: 9.1571,
-  radiusNmi: 20,
+  radiusNmi: 25,
   refreshSeconds: 10
 };
 
@@ -209,10 +209,8 @@ async function refresh() {
         <td class="route" id="route-${f.hex}"><span class="muted">lade…</span></td>
         <td>${altFmt}</td>
         <td>${speedKm} km/h</td>
-        <td>${f.distKm.Test ? '' : f.distKm.toFixed(1)} km</td>
+        <td>${f.distKm.toFixed(1)} km</td>
       `;
-      // Korrektur für saubere Distanz-Anzeige im Loop:
-      tr.cells[4].textContent = `${f.distKm.toFixed(1)} km`;
 
       tbody.appendChild(tr);
 
@@ -236,7 +234,7 @@ async function refresh() {
 
   } catch (e) {
     console.error("Fetch Fehler:", e);
-    setStatus('error', 'Verbindungsfehler');
+    setStatus('error', 'Verbindungsfehler (VPN/Adblock prüfen)');
   }
 }
 </script>
