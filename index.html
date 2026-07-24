@@ -168,11 +168,7 @@ const CONFIG = {
   lat: 48.69,
   lon: 9.16,
   radiusKm: 20,
-  refreshSeconds: 5,
-  
-  // 🔑 OPENSKY CREDENTIALS:
-  openskyUser: "klar67",
-  openskyPass: "Hu6T?aaKk"
+  refreshSeconds: 5
 };
 
 const routeCache = new Map();
@@ -364,35 +360,10 @@ async function fetchPhoto(hex) {
   }
 }
 
-// -------------------------------------------------------------
-// OPTIMIERTER API-ABRUF MIT TIMEOUT (2.5 sek max)
-// -------------------------------------------------------------
 async function fetchAircraftData() {
-  const latDelta = CONFIG.radiusKm / 111.0;
-  const lonDelta = CONFIG.radiusKm / (111.0 * Math.cos(CONFIG.lat * Math.PI / 180));
-  const latMin = (CONFIG.lat - latDelta).toFixed(4);
-  const latMax = (CONFIG.lat + latDelta).toFixed(4);
-  const lonMin = (CONFIG.lon - lonDelta).toFixed(4);
-  const lonMax = (CONFIG.lon + lonDelta).toFixed(4);
   const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
 
-  const headers = {};
-  if (CONFIG.openskyUser && CONFIG.openskyPass && CONFIG.openskyUser !== "DEIN_USERNAME") {
-    headers['Authorization'] = 'Basic ' + btoa(CONFIG.openskyUser + ':' + CONFIG.openskyPass);
-  }
-
   const sources = [
-    {
-      name: 'OpenSky Direct',
-      url: `https://opensky-network.org/api/states/all?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`,
-      headers: headers,
-      parse: (d) => (d.states || []).map(s => ({
-        hex: s[0], flight: s[1] ? s[1].trim() : '', lat: s[6], lon: s[5],
-        alt_baro: typeof s[7] === 'number' ? Math.round(s[7] * 3.28084) : 0,
-        gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0,
-        track: typeof s[10] === 'number' ? Math.round(s[10]) : 0
-      }))
-    },
     {
       name: 'CodeTabs Proxy (ADSB.lol)',
       url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
@@ -407,12 +378,7 @@ async function fetchAircraftData() {
 
   for (const src of sources) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5 Sek Timeout
-
-      const res = await fetch(src.url, { headers: src.headers || {}, signal: controller.signal });
-      clearTimeout(timeoutId);
-
+      const res = await fetch(src.url);
       if (res.ok) {
         const data = await res.json();
         const parsed = src.parse(data);
@@ -420,7 +386,7 @@ async function fetchAircraftData() {
       } else {
         logError(`${src.name} HTTP Status: ${res.status}`);
       }
-    } catch (e) { logError(`Timeout/Fehler bei ${src.name}: ${e.message}`); }
+    } catch (e) { logError(`Fehler bei ${src.name}: ${e.message}`); }
   }
   throw new Error("Fehler beim Abrufen der Flugdaten.");
 }
@@ -507,13 +473,9 @@ function renderFlights(flights) {
   const countElem = document.getElementById('countText');
   if (countElem) countElem.textContent = `${flights.length} Flugzeuge`;
 
-  // -------------------------------------------------------------
-  // LAZY RENDERING (Tabelle lädt sofort, Bilder/Routen asynchron)
-  // -------------------------------------------------------------
   for (const f of flights) {
     if (!tbody) break;
     const tr = document.createElement('tr');
-    tr.id = `row-${f.hex}`;
     const speedKm = Math.round(f.speedKt * 1.852);
     const altFmt = f.altFt > 0 ? `${f.altFt.toLocaleString('de-DE')} ft` : 'Boden';
 
@@ -538,39 +500,35 @@ function renderFlights(flights) {
 
     tbody.appendChild(tr);
 
-    // Asynchrones Laden ohne Hauptthread-Blockierung
-    setTimeout(() => {
-      fetchPhoto(f.hex).then(photoUrl => {
-        const cell = document.getElementById(`photo-${f.hex}`);
-        if (!cell) return;
-        cell.innerHTML = photoUrl ? `<a href="${photoUrl}" target="_blank" rel="noopener"><img src="${photoUrl}" alt="Flugzeug" class="plane-thumb" /></a>` : '<span class="muted">–</span>';
-      });
+    fetchPhoto(f.hex).then(photoUrl => {
+      const cell = document.getElementById(`photo-${f.hex}`);
+      if (!cell) return;
+      cell.innerHTML = photoUrl ? `<a href="${photoUrl}" target="_blank" rel="noopener"><img src="${photoUrl}" alt="Flugzeug" class="plane-thumb" /></a>` : '<span class="muted">–</span>';
+    });
 
-      if (f.callsign) {
-        fetchRoute(f.callsign).then(route => {
-          const cell = document.getElementById(`route-${f.hex}`);
-          const rowElem = document.getElementById(`row-${f.hex}`);
-          if (!cell) return;
-          if (route && route.origin && route.destination) {
-            cell.innerHTML = `${route.origin}<span class="arrow">→</span>${route.destination}`;
-            
-            const isLandingSTR = route.destCode === 'STR' || (route.destination && route.destination.includes('STR'));
-            if (isLandingSTR) {
-              if (rowElem) rowElem.classList.add('landing-str');
-              if (f.altFt > 0 && f.altFt < 5000 && !alertedPlanes.has(f.hex)) {
-                alertedPlanes.add(f.hex);
-                playGong();
-              }
-            }
-          } else {
-            cell.innerHTML = '<span class="muted">k.A.</span>';
-          }
-        });
-      } else {
+    if (f.callsign) {
+      fetchRoute(f.callsign).then(route => {
         const cell = document.getElementById(`route-${f.hex}`);
-        if (cell) cell.innerHTML = '<span class="muted">–</span>';
-      }
-    }, 10);
+        if (!cell) return;
+        if (route && route.origin && route.destination) {
+          cell.innerHTML = `${route.origin}<span class="arrow">→</span>${route.destination}`;
+          
+          const isLandingSTR = route.destCode === 'STR' || (route.destination && route.destination.includes('STR'));
+          if (isLandingSTR) {
+            tr.classList.add('landing-str');
+            if (f.altFt > 0 && f.altFt < 5000 && !alertedPlanes.has(f.hex)) {
+              alertedPlanes.add(f.hex);
+              playGong();
+            }
+          }
+        } else {
+          cell.innerHTML = '<span class="muted">k.A.</span>';
+        }
+      });
+    } else {
+      const cell = document.getElementById(`route-${f.hex}`);
+      if (cell) cell.innerHTML = '<span class="muted">–</span>';
+    }
   }
 }
 
