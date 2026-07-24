@@ -139,15 +139,31 @@ async function fetchRoute(callsign) {
   }
 }
 
+async function fetchAircraftData() {
+  // Primäre API: adsb.lol, Fallback API: adsb.one
+  const urls = [
+    `https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`,
+    `https://api.adsb.one/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn("API fehlgeschlagen, versuche Fallback...", url);
+    }
+  }
+  throw new Error("Alle APIs nicht erreichbar");
+}
+
 async function refresh() {
   setStatus('loading', 'Lade Daten…');
-  
-  const apiUrl = `https://api.adsb.lol/v2/lat/${CONFIG.lat}/lon/${CONFIG.lon}/dist/${CONFIG.radiusNmi}`;
 
   try {
-    const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error('HTTP status ' + res.status);
-    const data = await res.json();
+    const data = await fetchAircraftData();
     const acList = data.ac || [];
 
     const flights = acList
@@ -234,7 +250,7 @@ async function refresh() {
 
   } catch (e) {
     console.error("Fetch Fehler:", e);
-    setStatus('error', 'Verbindungsfehler (VPN/Adblock prüfen)');
+    setStatus('error', 'API-Verbindungsfehler');
   }
 }
 </script>
