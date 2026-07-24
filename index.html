@@ -164,7 +164,7 @@ const CONFIG = {
   lat: 48.6944,
   lon: 9.1571,
   radiusNmi: 25,
-  refreshSeconds: 10
+  refreshSeconds: 15
 };
 
 const routeCache = new Map();
@@ -231,7 +231,7 @@ async function fetchRoute(callsign) {
   if (!cs) return null;
   if (routeCache.has(cs)) return routeCache.get(cs);
   try {
-    const res = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);
+    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://api.adsbdb.com/v0/callsign/' + cs)}`);
     if (!res.ok) { routeCache.set(cs, null); return null; }
     const data = await res.json();
     const fr = data && data.response && data.response.flightroute;
@@ -249,10 +249,13 @@ async function fetchRoute(callsign) {
 }
 
 async function fetchAircraftData() {
+  const targetUrl = `https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`;
+  
   const endpoints = [
-    `https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`,
-    `https://api.adsb.one/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`,
-    `https://corsproxy.io/?` + encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`)
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+    `https://corsproxy.org/?${encodeURIComponent(targetUrl)}`,
+    targetUrl
   ];
 
   let lastError = null;
@@ -261,19 +264,22 @@ async function fetchAircraftData() {
     try {
       const res = await fetch(url);
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        if (data && (data.ac || Array.isArray(data.ac))) {
+          return data;
+        }
       } else {
-        const errText = `HTTP ${res.status} von URL: ${url}`;
+        const errText = `HTTP ${res.status} bei URL: ${url}`;
         logError(errText);
         lastError = new Error(errText);
       }
     } catch (e) {
-      const errText = `Netzwerkfehler (${e.message}) bei URL: ${url}`;
+      const errText = `Netzwerk/CORS-Fehler (${e.message}) bei URL: ${url}`;
       logError(errText);
       lastError = e;
     }
   }
-  throw lastError || new Error("Alle Endpunkte unreichbar");
+  throw lastError || new Error("Alle Daten-Proxy-Endpunkte fehlgeschlagen");
 }
 
 async function refresh() {
