@@ -163,7 +163,7 @@
 const CONFIG = {
   lat: 48.6944,
   lon: 9.1571,
-  radiusNmi: 25,
+  radiusKm: 20, // Exakter Radius in km
   refreshSeconds: 15
 };
 
@@ -231,14 +231,23 @@ async function fetchRoute(callsign) {
   if (!cs) return null;
   if (routeCache.has(cs)) return routeCache.get(cs);
   try {
-    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://api.adsbdb.com/v0/callsign/' + cs)}`);
+    const res = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);
     if (!res.ok) { routeCache.set(cs, null); return null; }
     const data = await res.json();
     const fr = data && data.response && data.response.flightroute;
     if (!fr) { routeCache.set(cs, null); return null; }
+    
+    const formatAirport = (ap) => {
+      if (!ap) return null;
+      const code = ap.iata_code || ap.icao_code || '';
+      const city = ap.municipality || ap.name || '';
+      if (code && city) return `${code} (${city})`;
+      return code || city || null;
+    };
+
     const result = {
-      origin: fr.origin ? (fr.origin.iata_code || fr.origin.icao_code) : null,
-      destination: fr.destination ? (fr.destination.iata_code || fr.destination.icao_code) : null
+      origin: formatAirport(fr.origin),
+      destination: formatAirport(fr.destination)
     };
     routeCache.set(cs, result);
     return result;
@@ -249,37 +258,58 @@ async function fetchRoute(callsign) {
 }
 
 async function fetchAircraftData() {
-  const targetUrl = `https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${CONFIG.radiusNmi}`;
-  
-  const endpoints = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-    `https://corsproxy.org/?${encodeURIComponent(targetUrl)}`,
-    targetUrl
-  ];
+  // Umrechnung 20km Radius in Bounding Box Koordinaten
+  const latDelta = CONFIG.radiusKm / 111.0;
+  const lonDelta = CONFIG.radiusKm / (111.0 * Math.cos(CONFIG.lat * Math.PI / 180));
 
-  let lastError = null;
+  const latMin = (CONFIG.lat - latDelta).toFixed(4);
+  const latMax = (CONFIG.lat + latDelta).toFixed(4);
+  const lonMin = (CONFIG.lon - lonDelta).toFixed(4);
+  const lonMax = (CONFIG.lon + lonDelta).toFixed(4);
 
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && (data.ac || Array.isArray(data.ac))) {
-          return data;
-        }
-      } else {
-        const errText = `HTTP ${res.status} bei URL: ${url}`;
-        logError(errText);
-        lastError = new Error(errText);
-      }
-    } catch (e) {
-      const errText = `Netzwerk/CORS-Fehler (${e.message}) bei URL: ${url}`;
-      logError(errText);
-      lastError = e;
+  // 1. Primäre Quelle: OpenSky Network
+  const openSkyUrl = `https://opensky-network.org/api/states/all?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`;
+
+  try {
+    const res = await fetch(openSkyUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const rawStates = data.states || [];
+      const acList = rawStates
+        .filter(s => s && typeof s[6] === 'number' && typeof s[5] === 'number')
+        .map(s => ({
+          hex: s[0],
+          flight: s[1] ? s[1].trim() : '',
+          lat: s[6],
+          lon: s[5],
+          alt_baro: typeof s[7] === 'number' ? Math.round(s[7] * 3.28084) : 0,
+          gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0
+        }));
+      return { ac: acList };
+    } else {
+      logError(`OpenSky HTTP Status: ${res.status}`);
     }
+  } catch (e) {
+    logError(`OpenSky Direktabruf fehlgeschlagen: ${e.message}`);
   }
-  throw lastError || new Error("Alle Daten-Proxy-Endpunkte fehlgeschlagen");
+
+  // 2. Fallback Quelle via AllOrigins Proxy (20 km in Seemeilen = ~10.8 NMi)
+  const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
+  const fallbackTarget = `https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fallbackTarget)}`;
+
+  try {
+    const res = await fetch(proxyUrl);
+    if (res.ok) {
+      return await res.json();
+    } else {
+      logError(`AllOrigins Proxy HTTP Status: ${res.status}`);
+    }
+  } catch (e) {
+    logError(`Fallback Proxy Fehler: ${e.message}`);
+  }
+
+  throw new Error("Sämtliche Datenquellen unerreichbar.");
 }
 
 async function refresh() {
@@ -289,6 +319,7 @@ async function refresh() {
     const data = await fetchAircraftData();
     const acList = data.ac || [];
 
+    // Filtert strikt alle Flugzeuge heraus, die weiter als 20.0 km entfernt sind
     const flights = acList
       .filter(f => f && typeof f.lat === 'number' && typeof f.lon === 'number')
       .map(f => {
@@ -303,6 +334,7 @@ async function refresh() {
           distKm: dist
         };
       })
+      .filter(f => f.distKm <= CONFIG.radiusKm)
       .sort((a, b) => a.distKm - b.distKm);
 
     if (map) {
