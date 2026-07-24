@@ -163,12 +163,14 @@
 const CONFIG = {
   lat: 48.6944,
   lon: 9.1571,
-  radiusKm: 20, // Exakter Radius in km
+  radiusKm: 20,
   refreshSeconds: 15
 };
 
 const routeCache = new Map();
 const errorLogs = [];
+let lastSuccessfulFlights = null;
+let consecutiveErrors = 0;
 
 function logError(msg) {
   const timestamp = new Date().toLocaleTimeString('de-DE');
@@ -258,7 +260,6 @@ async function fetchRoute(callsign) {
 }
 
 async function fetchAircraftData() {
-  // Umrechnung 20km Radius in Bounding Box Koordinaten
   const latDelta = CONFIG.radiusKm / 111.0;
   const lonDelta = CONFIG.radiusKm / (111.0 * Math.cos(CONFIG.lat * Math.PI / 180));
 
@@ -266,146 +267,159 @@ async function fetchAircraftData() {
   const latMax = (CONFIG.lat + latDelta).toFixed(4);
   const lonMin = (CONFIG.lon - lonDelta).toFixed(4);
   const lonMax = (CONFIG.lon + lonDelta).toFixed(4);
-
-  // 1. Primäre Quelle: OpenSky Network
-  const openSkyUrl = `https://opensky-network.org/api/states/all?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`;
-
-  try {
-    const res = await fetch(openSkyUrl);
-    if (res.ok) {
-      const data = await res.json();
-      const rawStates = data.states || [];
-      const acList = rawStates
-        .filter(s => s && typeof s[6] === 'number' && typeof s[5] === 'number')
-        .map(s => ({
-          hex: s[0],
-          flight: s[1] ? s[1].trim() : '',
-          lat: s[6],
-          lon: s[5],
-          alt_baro: typeof s[7] === 'number' ? Math.round(s[7] * 3.28084) : 0,
-          gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0
-        }));
-      return { ac: acList };
-    } else {
-      logError(`OpenSky HTTP Status: ${res.status}`);
-    }
-  } catch (e) {
-    logError(`OpenSky Direktabruf fehlgeschlagen: ${e.message}`);
-  }
-
-  // 2. Fallback Quelle via AllOrigins Proxy (20 km in Seemeilen = ~10.8 NMi)
   const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
-  const fallbackTarget = `https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fallbackTarget)}`;
 
-  try {
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
-      return await res.json();
-    } else {
-      logError(`AllOrigins Proxy HTTP Status: ${res.status}`);
+  const sources = [
+    {
+      name: 'OpenSky Direct',
+      url: `https://opensky-network.org/api/states/all?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`,
+      parse: (d) => (d.states || []).map(s => ({
+        hex: s[0],
+        flight: s[1] ? s[1].trim() : '',
+        lat: s[6],
+        lon: s[5],
+        alt_baro: typeof s[7] === 'number' ? Math.round(s[7] * 3.28084) : 0,
+        gs: typeof s[9] === 'number' ? Math.round(s[9] * 1.94384) : 0
+      }))
+    },
+    {
+      name: 'CodeTabs Proxy (ADSB.lol)',
+      url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
+      parse: (d) => d.ac || []
+    },
+    {
+      name: 'AllOrigins Proxy (ADSB.lol)',
+      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
+      parse: (d) => d.ac || []
     }
-  } catch (e) {
-    logError(`Fallback Proxy Fehler: ${e.message}`);
+  ];
+
+  for (const src of sources) {
+    try {
+      const res = await fetch(src.url);
+      if (res.ok) {
+        const data = await res.json();
+        const parsed = src.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      } else {
+        logError(`${src.name} HTTP Status: ${res.status}`);
+      }
+    } catch (e) {
+      logError(`${src.name} Netzwerkfehler: ${e.message}`);
+    }
   }
 
-  throw new Error("Sämtliche Datenquellen unerreichbar.");
+  throw new Error("Alle Datenquellen temporär unerreichbar.");
+}
+
+function renderFlights(flights) {
+  if (map) {
+    const seen = new Set();
+    for (const f of flights) {
+      seen.add(f.hex);
+      if (markers.has(f.hex)) {
+        markers.get(f.hex).setLatLng([f.lat, f.lon]);
+      } else {
+        const m = L.marker([f.lat, f.lon]).addTo(map);
+        markers.set(f.hex, m);
+      }
+    }
+    for (const [hex, m] of markers) {
+      if (!seen.has(hex)) { map.removeLayer(m); markers.delete(hex); }
+    }
+  }
+
+  const tbody = document.getElementById('tbody');
+  const emptyMsg = document.getElementById('emptyMsg');
+  if (tbody) tbody.innerHTML = '';
+  
+  if (emptyMsg) {
+    if (flights.length === 0) {
+      emptyMsg.style.display = 'block';
+      emptyMsg.textContent = 'Kein Flugverkehr im Umkreis erfasst.';
+    } else {
+      emptyMsg.style.display = 'none';
+    }
+  }
+
+  const countElem = document.getElementById('countText');
+  if (countElem) countElem.textContent = `${flights.length} Flugzeuge`;
+
+  for (const f of flights) {
+    if (!tbody) break;
+    const tr = document.createElement('tr');
+    const speedKm = Math.round(f.speedKt * 1.852);
+    const altFmt = f.altFt > 0 ? `${f.altFt.toLocaleString('de-DE')} ft` : 'Boden';
+
+    tr.innerHTML = `
+      <td>✈️ ${f.callsign || '<span class="muted">' + f.hex + '</span>'}</td>
+      <td class="route" id="route-${f.hex}"><span class="muted">lade…</span></td>
+      <td>${altFmt}</td>
+      <td>${speedKm} km/h</td>
+      <td>${f.distKm.toFixed(1)} km</td>
+    `;
+
+    tbody.appendChild(tr);
+
+    if (f.callsign) {
+      fetchRoute(f.callsign).then(route => {
+        const cell = document.getElementById(`route-${f.hex}`);
+        if (!cell) return;
+        if (route && route.origin && route.destination) {
+          cell.innerHTML = `${route.origin}<span class="arrow">→</span>${route.destination}`;
+        } else {
+          cell.innerHTML = '<span class="muted">k.A.</span>';
+        }
+      });
+    } else {
+      const cell = document.getElementById(`route-${f.hex}`);
+      if (cell) cell.innerHTML = '<span class="muted">–</span>';
+    }
+  }
 }
 
 async function refresh() {
   setStatus('loading', 'Lade Daten…');
 
+  let acList = null;
   try {
-    const data = await fetchAircraftData();
-    const acList = data.ac || [];
-
-    // Filtert strikt alle Flugzeuge heraus, die weiter als 20.0 km entfernt sind
-    const flights = acList
-      .filter(f => f && typeof f.lat === 'number' && typeof f.lon === 'number')
-      .map(f => {
-        const dist = haversineKm(CONFIG.lat, CONFIG.lon, f.lat, f.lon);
-        return {
-          hex: f.hex,
-          callsign: (f.flight || '').trim(),
-          lat: f.lat,
-          lon: f.lon,
-          altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
-          speedKt: typeof f.gs === 'number' ? f.gs : 0,
-          distKm: dist
-        };
-      })
-      .filter(f => f.distKm <= CONFIG.radiusKm)
-      .sort((a, b) => a.distKm - b.distKm);
-
-    if (map) {
-      const seen = new Set();
-      for (const f of flights) {
-        seen.add(f.hex);
-        if (markers.has(f.hex)) {
-          markers.get(f.hex).setLatLng([f.lat, f.lon]);
-        } else {
-          const m = L.marker([f.lat, f.lon]).addTo(map);
-          markers.set(f.hex, m);
-        }
-      }
-      for (const [hex, m] of markers) {
-        if (!seen.has(hex)) { map.removeLayer(m); markers.delete(hex); }
-      }
-    }
-
-    const tbody = document.getElementById('tbody');
-    const emptyMsg = document.getElementById('emptyMsg');
-    if (tbody) tbody.innerHTML = '';
-    
-    if (emptyMsg) {
-      if (flights.length === 0) {
-        emptyMsg.style.display = 'block';
-        emptyMsg.textContent = 'Kein Flugverkehr im Umkreis erfasst.';
-      } else {
-        emptyMsg.style.display = 'none';
-      }
-    }
-
-    const countElem = document.getElementById('countText');
-    if (countElem) countElem.textContent = `${flights.length} Flugzeuge`;
-
-    for (const f of flights) {
-      if (!tbody) break;
-      const tr = document.createElement('tr');
-      const speedKm = Math.round(f.speedKt * 1.852);
-      const altFmt = f.altFt > 0 ? `${f.altFt.toLocaleString('de-DE')} ft` : 'Boden';
-
-      tr.innerHTML = `
-        <td>✈️ ${f.callsign || '<span class="muted">' + f.hex + '</span>'}</td>
-        <td class="route" id="route-${f.hex}"><span class="muted">lade…</span></td>
-        <td>${altFmt}</td>
-        <td>${speedKm} km/h</td>
-        <td>${f.distKm.toFixed(1)} km</td>
-      `;
-
-      tbody.appendChild(tr);
-
-      if (f.callsign) {
-        fetchRoute(f.callsign).then(route => {
-          const cell = document.getElementById(`route-${f.hex}`);
-          if (!cell) return;
-          if (route && route.origin && route.destination) {
-            cell.innerHTML = `${route.origin}<span class="arrow">→</span>${route.destination}`;
-          } else {
-            cell.innerHTML = '<span class="muted">k.A.</span>';
-          }
-        });
-      } else {
-        const cell = document.getElementById(`route-${f.hex}`);
-        if (cell) cell.innerHTML = '<span class="muted">–</span>';
-      }
-    }
-
-    setStatus('ok', 'Live: ' + new Date().toLocaleTimeString('de-DE'));
-
+    acList = await fetchAircraftData();
+    consecutiveErrors = 0;
   } catch (e) {
-    setStatus('error', 'Verbindungsfehler (Klick für Info)');
+    consecutiveErrors++;
+    logError(`Fehler bei Abrufversuch ${consecutiveErrors}: ${e.message}`);
+    
+    // Falls vorübergehende Störung: Daten gepuffert anzeigen statt sofort abzubrechen
+    if (lastSuccessfulFlights && consecutiveErrors < 3) {
+      setStatus('loading', `Puffere Daten (${consecutiveErrors}/3)…`);
+      renderFlights(lastSuccessfulFlights);
+      return;
+    } else {
+      setStatus('error', 'Verbindungsfehler (Klick für Info)');
+      return;
+    }
   }
+
+  const flights = acList
+    .filter(f => f && typeof f.lat === 'number' && typeof f.lon === 'number')
+    .map(f => {
+      const dist = haversineKm(CONFIG.lat, CONFIG.lon, f.lat, f.lon);
+      return {
+        hex: f.hex,
+        callsign: (f.flight || '').trim(),
+        lat: f.lat,
+        lon: f.lon,
+        altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
+        speedKt: typeof f.gs === 'number' ? f.gs : 0,
+        distKm: dist
+      };
+    })
+    .filter(f => f.distKm <= CONFIG.radiusKm)
+    .sort((a, b) => a.distKm - b.distKm);
+
+  lastSuccessfulFlights = flights;
+  renderFlights(flights);
+  setStatus('ok', 'Live: ' + new Date().toLocaleTimeString('de-DE'));
 }
 </script>
 </body>
