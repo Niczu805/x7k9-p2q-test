@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flugzeugradar</title>
     
-    <!-- Leaflet CSS für die Karte -->
+    <!-- Leaflet CSS für die interaktive Karte -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
@@ -51,7 +51,7 @@
             gap: 8px;
             color: #bbb;
         }
-        /* Switch Toggle */
+        /* Switch Toggle für Ton */
         .switch {
             position: relative;
             display: inline-block;
@@ -97,12 +97,12 @@
         .dot {
             height: 8px;
             width: 8px;
-            background-color: #4CAF50;
+            background-color: #FFA500;
             border-radius: 50%;
             display: inline-block;
         }
 
-        /* Karten-Container nimmt den restlichen Bildschirm ein */
+        /* Karten-Container nimmt den Bereich unter dem Header ein */
         #map {
             position: absolute;
             top: 50px;
@@ -134,6 +134,12 @@
         .center-btn:hover {
             background-color: #333;
         }
+
+        /* Flugzeug-Icon Drehung */
+        .plane-icon {
+            background: transparent;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -157,7 +163,7 @@
         </div>
     </header>
 
-    <!-- Die interaktive Karte -->
+    <!-- Interaktive Karte -->
     <div id="map"></div>
 
     <button class="center-btn" onclick="centerMap()">
@@ -168,7 +174,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Deine Koordinaten (Region Stuttgart)
+        // Konfiguration (Stuttgart Region)
         const CONFIG = {
             lat: 48.6913,
             lon: 9.1843
@@ -176,7 +182,7 @@
 
         const radiusNmi = 20; // Umkreis in nautischen Meilen
 
-        // Karte initialisieren (Dunkles Theme passend zum Radar)
+        // Karte initialisieren mit Dark-Theme Tiles
         const map = L.map('map', {
             zoomControl: false
         }).setView([CONFIG.lat, CONFIG.lon], 10);
@@ -187,7 +193,7 @@
             maxZoom: 19
         }).addTo(map);
 
-        // Marker- und Trace-Speicher
+        // Speicher für Marker und Flugspuren (Traces)
         const markers = {};
         const traces = {};
 
@@ -197,6 +203,7 @@
 
         async function fetchFlightData() {
             try {
+                // Abruf über deinen Cloudflare Worker Proxy
                 const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
                 
                 const response = await fetch(workerUrl);
@@ -209,13 +216,14 @@
 
                 updateRadar(flights);
                 
+                // Status aktualisieren
                 document.getElementById('status-text').textContent = `${flights.length} Flugzeuge`;
-                document.getElementById('status-dot').style.backgroundColor = '#4CAF50';
+                document.getElementById('status-dot').style.backgroundColor = '#4CAF50'; // Grün bei Erfolg
 
             } catch (error) {
-                console.error("Fehler beim Abrufen:", error);
+                console.error("Fehler beim Abrufen der Flugdaten:", error);
                 document.getElementById('status-text').textContent = "Fehler";
-                document.getElementById('status-dot').style.backgroundColor = '#f44336';
+                document.getElementById('status-dot').style.backgroundColor = '#f44336'; // Rot bei Fehler
             }
         }
 
@@ -229,35 +237,48 @@
                 const pos = [flight.lat, flight.lon];
                 const callsign = flight.flight ? flight.flight.trim() : flight.hex;
 
-                // Trace (Pfad) aktualisieren
+                // 1. Flugspur (Trace) aktualisieren / erstellen
                 if (!traces[flight.hex]) {
-                    traces[flight.hex] = L.polyline([pos], { color: '#2196F3', weight: 2, opacity: 0.7 }).addTo(map);
+                    traces[flight.hex] = L.polyline([pos], { 
+                        color: '#2196F3', 
+                        weight: 2, 
+                        opacity: 0.7 
+                    }).addTo(map);
                 } else {
                     const latlngs = traces[flight.hex].getLatLngs();
                     latlngs.push(pos);
-                    if (latlngs.length > 30) latlngs.shift(); // Max 30 Punkte behalten
+                    if (latlngs.length > 30) latlngs.shift(); // Maximal 30 historische Punkte behalten
                     traces[flight.hex].setLatLngs(latlngs);
                 }
 
-                // Marker aktualisieren oder erstellen
+                // 2. Flugzeug-Marker aktualisieren / erstellen
+                const heading = flight.track || 0;
+                const iconHtml = `<div style="transform: rotate(${heading}deg); font-size: 16px; text-align: center; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));">✈️</div>`;
+
                 if (!markers[flight.hex]) {
                     const icon = L.divIcon({
                         className: 'plane-icon',
-                        html: `<div style="transform: rotate(${flight.track || 0}deg); font-size: 16px;">✈️</div>`,
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
+                        html: iconHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
                     });
 
                     markers[flight.hex] = L.marker(pos, { icon: icon }).addTo(map)
                         .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${flight.alt_baro || 'N/A'} ft<br><b>Speed:</b> ${flight.gs || 'N/A'} kn`);
                 } else {
                     markers[flight.hex].setLatLng(pos);
-                    // Popup-Inhalt aktualisieren
+                    // Icon-Rotation bei Kurswechsel anpassen
+                    markers[flight.hex].setIcon(L.divIcon({
+                        className: 'plane-icon',
+                        html: iconHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    }));
                     markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${flight.alt_baro || 'N/A'} ft<br><b>Speed:</b> ${flight.gs || 'N/A'} kn`);
                 }
             });
 
-            // Alte Flugzeuge entfernen, die nicht mehr im Feed sind
+            // Veraltete Flugzeuge, die den Radius verlassen haben, von der Karte entfernen
             for (const hex in markers) {
                 if (!activeHexes.has(hex)) {
                     map.removeLayer(markers[hex]);
@@ -268,7 +289,7 @@
             }
         }
 
-        // Start und Intervall (alle 10 Sekunden)
+        // Initialer Abruf und automatisches Intervall alle 10 Sekunden
         fetchFlightData();
         setInterval(fetchFlightData, 10000);
     </script>
