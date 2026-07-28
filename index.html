@@ -169,13 +169,13 @@
         }
         tr:hover { background-color: #181818; }
 
-        /* Hervorhebung für Flüge mit Ziel Stuttgart */
+        /* Hellere Hervorhebung für Flüge mit Ziel Stuttgart */
         tr.highlight-str {
-            background-color: rgba(255, 215, 0, 0.12) !important;
+            background-color: rgba(255, 215, 0, 0.25) !important;
             border-left: 4px solid #ffd700;
         }
         tr.highlight-str:hover {
-            background-color: rgba(255, 215, 0, 0.2) !important;
+            background-color: rgba(255, 215, 0, 0.35) !important;
         }
 
         .plane-thumb {
@@ -240,7 +240,6 @@
                 </label>
             </div>
             
-            <!-- Kombinierter Button für Status & Fehlerprotokoll -->
             <button class="status-btn" id="status-btn" onclick="toggleErrorLog()" title="Klicken für Fehlerprotokoll">
                 <span class="dot" id="status-dot"></span>
                 <span id="status-text">Lade...</span>
@@ -298,6 +297,8 @@
         // 5.4 Nautische Meilen = ca. 10 km Radius
         const radiusNmi = 5.4; 
         const photoCache = {};
+        const routeCache = {};
+        const strSoundPlayed = new Set(); // Merkt sich, ob für dieses Flugzeug bereits der Stuttgart-Ton abgespielt wurde
 
         const AIRPORT_CITIES = {
             'STR': 'Stuttgart', 'EDDS': 'Stuttgart',
@@ -329,8 +330,46 @@
             'HER': 'Heraklion/Kreta', 'LGIR': 'Heraklion/Kreta',
             'RHO': 'Rhodos', 'LGRP': 'Rhodos',
             'ATH': 'Athen', 'LGAV': 'Athen',
-            'CFU': 'Korfu', 'LGKR': 'Korfu'
+            'CFU': 'Korfu', 'LGKR': 'Korfu',
+            'PRG': 'Prag', 'LKPR': 'Prag'
         };
+
+        // Radar-Ping Sound per Web Audio API (mit Unterscheidung für Stuttgart)
+        function playRadarPing(isStuttgartLanding = false) {
+            const soundEnabled = document.getElementById('soundToggle').checked;
+            if (!soundEnabled) return;
+
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+
+                if (isStuttgartLanding) {
+                    // Höherer, prägnanterer Doppel-Ton für Landung in Stuttgart
+                    osc.frequency.setValueAtTime(1320, audioCtx.currentTime); // High pitch (E6)
+                    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.35);
+                    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                    osc.stop(audioCtx.currentTime + 0.35);
+                } else {
+                    // Normaler Flugzeug-Einflug Signalton
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                    osc.stop(audioCtx.currentTime + 0.25);
+                }
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+
+            } catch (e) {
+                // AudioContext eventuell vom Browser pausiert
+            }
+        }
 
         function toggleErrorLog() {
             const modal = document.getElementById('error-log-modal');
@@ -345,7 +384,6 @@
             console.error(message);
         }
 
-        // Zoomstufe 12 passt ideal für 10 km Ausschnitt
         const map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 12);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -372,34 +410,64 @@
             return (R * c).toFixed(1) + " km";
         }
 
-        function processRoute(routeRaw) {
-            if (!routeRaw || routeRaw === 'Unbekannt') {
-                return { formatted: 'Unbekannt', isDestStuttgart: false };
+        function formatAirport(code) {
+            if (!code) return '';
+            const cleanCode = code.trim().toUpperCase();
+            const city = AIRPORT_CITIES[cleanCode];
+            return city ? `${cleanCode} (${city})` : cleanCode;
+        }
+
+        async function fetchRouteInfo(callsign, routeTdId, trElement, hex) {
+            if (!callsign || callsign === 'N/A') return;
+
+            if (routeCache[callsign]) {
+                applyRouteToUi(routeCache[callsign], routeTdId, trElement, hex);
+                return;
             }
 
-            const parts = routeRaw.split(/[\s\->\-]+/).filter(Boolean);
-            
-            if (parts.length >= 2) {
-                const origin = parts[0].toUpperCase();
-                const dest = parts[parts.length - 1].toUpperCase();
+            try {
+                const res = await fetch(`https://hexdb.io/api/v1/route/callsign/${callsign}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.origin && data.destination) {
+                        const originStr = formatAirport(data.origin);
+                        const destStr = formatAirport(data.destination);
+                        const destClean = data.destination.trim().toUpperCase();
+                        
+                        const isDestStuttgart = (destClean === 'STR' || destClean === 'EDDS');
 
-                const originCity = AIRPORT_CITIES[origin] ? ` (${AIRPORT_CITIES[origin]})` : '';
-                const destCity = AIRPORT_CITIES[dest] ? ` (${AIRPORT_CITIES[dest]})` : '';
+                        const routeObj = {
+                            formatted: `${originStr} → ${destStr}`,
+                            isDestStuttgart: isDestStuttgart
+                        };
 
-                const formatted = `${origin}${originCity} → ${dest}${destCity}`;
-                const isDestStuttgart = (dest === 'STR' || dest === 'EDDS' || destCity.includes('Stuttgart'));
-
-                return { formatted, isDestStuttgart };
-            } else if (parts.length === 1) {
-                const code = parts[0].toUpperCase();
-                const city = AIRPORT_CITIES[code] ? ` (${AIRPORT_CITIES[code]})` : '';
-                return { 
-                    formatted: `${code}${city}`, 
-                    isDestStuttgart: (code === 'STR' || code === 'EDDS' || city.includes('Stuttgart')) 
-                };
+                        routeCache[callsign] = routeObj;
+                        applyRouteToUi(routeObj, routeTdId, trElement, hex);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Route nicht vorhanden
             }
 
-            return { formatted: routeRaw, isDestStuttgart: false };
+            routeCache[callsign] = { formatted: 'Unbekannt', isDestStuttgart: false };
+            applyRouteToUi(routeCache[callsign], routeTdId, trElement, hex);
+        }
+
+        function applyRouteToUi(routeObj, routeTdId, trElement, hex) {
+            const td = document.getElementById(routeTdId);
+            if (td) {
+                td.textContent = routeObj.formatted;
+            }
+            if (routeObj.isDestStuttgart) {
+                if (trElement) trElement.classList.add('highlight-str');
+                
+                // Spezieller Ton ertönt, sobald erkannt wird, dass das Flugzeug in Stuttgart landet
+                if (hex && !strSoundPlayed.has(hex)) {
+                    strSoundPlayed.add(hex);
+                    playRadarPing(true);
+                }
+            }
         }
 
         async function loadPlanePhoto(hex, imgId) {
@@ -422,7 +490,7 @@
                     }
                 }
             } catch (e) {
-                // Bei Fehler Fallback
+                // Fallback
             }
 
             photoCache[hex] = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='45' height='30'><rect width='100%' height='100%' fill='%23222'/><text x='50%' y='55%' fill='%23666' font-size='9' text-anchor='middle' dominant-baseline='central'>Kein</text></svg>";
@@ -465,11 +533,17 @@
 
             flights.forEach(flight => {
                 if (!flight.hex) return;
+                
+                // Normaler Ton, wenn ein neues Flugzeug generell den 10km Radius betritt
+                if (!markers[flight.hex]) {
+                    playRadarPing(false);
+                }
+
                 activeHexes.add(flight.hex);
 
                 const callsign = flight.flight ? flight.flight.trim() : flight.hex;
                 
-                // Höhe in Metern umrechnen (1 ft = 0.3048 m)
+                // Höhe in Metern umrechnen
                 let alt = 'N/A';
                 if (flight.alt_baro !== undefined && flight.alt_baro !== null) {
                     if (typeof flight.alt_baro === 'number') {
@@ -488,18 +562,15 @@
                     dist = calculateDistance(CONFIG.lat, CONFIG.lon, flight.lat, flight.lon);
                 }
 
-                const routeInfo = processRoute(flight.r);
                 const imgId = `photo-${flight.hex}`;
+                const routeTdId = `route-${flight.hex}`;
 
                 const tr = document.createElement('tr');
-                if (routeInfo.isDestStuttgart) {
-                    tr.classList.add('highlight-str');
-                }
 
                 tr.innerHTML = `
                     <td><strong>${callsign}</strong></td>
                     <td><img id="${imgId}" class="plane-thumb" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='45' height='30'><rect width='100%' height='100%' fill='%23222'/><text x='50%' y='55%' fill='%23666' font-size='9' text-anchor='middle' dominant-baseline='central'>...</text></svg>"></td>
-                    <td>${routeInfo.formatted}</td>
+                    <td id="${routeTdId}">Lade Route...</td>
                     <td>${alt}</td>
                     <td>${speedKmh}</td>
                     <td>${dist}</td>
@@ -507,6 +578,7 @@
                 tbody.appendChild(tr);
 
                 loadPlanePhoto(flight.hex, imgId);
+                fetchRouteInfo(callsign, routeTdId, tr, flight.hex);
 
                 if (flight.lat && flight.lon) {
                     const pos = [flight.lat, flight.lon];
@@ -532,11 +604,11 @@
                     if (!markers[flight.hex]) {
                         const icon = L.divIcon({ className: 'plane-icon', html: iconHtml, iconSize: [26, 26], iconAnchor: [13, 13] });
                         markers[flight.hex] = L.marker(pos, { icon: icon }).addTo(map)
-                            .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Route:</b> ${routeInfo.formatted}<br><b>Höhe:</b> ${alt}<br><b>Geschw.:</b> ${speedKmh}`);
+                            .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${alt}<br><b>Geschw.:</b> ${speedKmh}`);
                     } else {
                         markers[flight.hex].setLatLng(pos);
                         markers[flight.hex].setIcon(L.divIcon({ className: 'plane-icon', html: iconHtml, iconSize: [26, 26], iconAnchor: [13, 13] }));
-                        markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Route:</b> ${routeInfo.formatted}<br><b>Höhe:</b> ${alt}<br><b>Geschw.:</b> ${speedKmh}`);
+                        markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${alt}<br><b>Geschw.:</b> ${speedKmh}`);
                     }
                 }
             });
@@ -547,6 +619,7 @@
                     if (traces[hex]) map.removeLayer(traces[hex]);
                     delete markers[hex];
                     delete traces[hex];
+                    strSoundPlayed.delete(hex);
                 }
             }
         }
