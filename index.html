@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flugzeugradar</title>
+    <title>Flugzeugradar - Komplettansicht</title>
     
-    <!-- Leaflet CSS für die interaktive Karte -->
+    <!-- Leaflet CSS für die Karte -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
@@ -15,20 +15,21 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
             overflow: hidden;
         }
+        
+        /* Header */
         header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 50px;
             background-color: #1a1a1a;
-            padding: 0 20px;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #2a2a2a;
+            height: 50px;
             z-index: 1000;
         }
         .header-title {
@@ -51,6 +52,7 @@
             gap: 8px;
             color: #bbb;
         }
+
         /* Switch Toggle für Ton */
         .switch {
             position: relative;
@@ -58,41 +60,26 @@
             width: 36px;
             height: 20px;
         }
-        .switch input { 
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #444;
-            transition: .3s;
-            border-radius: 20px;
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #444; transition: .3s; border-radius: 20px;
         }
         .slider:before {
-            position: absolute;
-            content: "";
-            height: 14px;
-            width: 14px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
+            position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .3s; border-radius: 50%;
         }
-        input:checked + .slider {
-            background-color: #2196F3;
-        }
-        input:checked + .slider:before {
-            transform: translateX(16px);
-        }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(16px); }
         
-        .status-indicator {
+        .status-badge {
             display: flex;
             align-items: center;
             gap: 6px;
+            background: #2a2a2a;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
         }
         .dot {
             height: 8px;
@@ -102,26 +89,79 @@
             display: inline-block;
         }
 
-        /* Karten-Container nimmt den Bereich unter dem Header ein */
+        /* Layout: Split-Screen (Oben Karte, Unten Tabelle) */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
         #map {
-            position: absolute;
-            top: 50px;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            height: 45vh;
+            width: 100%;
             background-color: #121212;
-            z-index: 1;
+            border-bottom: 2px solid #2a2a2a;
+        }
+
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+            background-color: #121212;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px 20px;
+            text-align: left;
+            border-bottom: 1px solid #1f1f1f;
+            font-size: 13px;
+        }
+        th {
+            color: #777;
+            font-size: 11px;
+            text-transform: uppercase;
+            background-color: #161616;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        tr:hover { background-color: #181818; }
+
+        /* Flugzeug-Thumbnail in Tabelle */
+        .plane-thumb {
+            width: 40px;
+            height: 25px;
+            object-fit: cover;
+            border-radius: 3px;
+            background: #333;
+        }
+
+        /* Fehlerprotokoll / Konsole unten */
+        #error-log {
+            background-color: #0b0b0b;
+            color: #ff5555;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 6px 15px;
+            border-top: 1px solid #222;
+            max-height: 60px;
+            overflow-y: auto;
+            white-space: pre-wrap;
         }
 
         /* Zentrieren Button */
         .center-btn {
             position: fixed;
-            bottom: 25px;
-            right: 25px;
+            bottom: 80px;
+            right: 20px;
             background-color: #2a2a2a;
             color: white;
             border: 1px solid #444;
-            padding: 10px 16px;
+            padding: 8px 14px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
@@ -129,24 +169,16 @@
             align-items: center;
             gap: 6px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            z-index: 1000;
+            z-index: 2000;
         }
-        .center-btn:hover {
-            background-color: #333;
-        }
-
-        /* Flugzeug-Icon Drehung */
-        .plane-icon {
-            background: transparent;
-            border: none;
-        }
+        .center-btn:hover { background-color: #333; }
     </style>
 </head>
 <body>
 
     <header>
         <div class="header-title">
-            <span>✈️</span> Flugzeugradar
+            <span>✈️</span> Flugzeugradar (Stuttgart & Umgebung)
         </div>
         <div class="header-controls">
             <div class="control-item">
@@ -156,15 +188,39 @@
                     <span class="slider"></span>
                 </label>
             </div>
-            <div class="status-indicator">
+            <div class="status-badge">
                 <span class="dot" id="status-dot"></span>
                 <span id="status-text">Lade...</span>
             </div>
         </div>
     </header>
 
-    <!-- Interaktive Karte -->
-    <div id="map"></div>
+    <div class="main-container">
+        <!-- Karte -->
+        <div id="map"></div>
+
+        <!-- Tabelle mit allen Spalten -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CALLSIGN</th>
+                        <th>FOTO</th>
+                        <th>ROUTE (START → ZIEL)</th>
+                        <th>HÖHE</th>
+                        <th>GESCHW.</th>
+                        <th>DISTANZ</th>
+                    </tr>
+                </thead>
+                <tbody id="flight-table-body">
+                    <tr><td colspan="6" style="text-align: center; color: #666; padding: 30px;">Suche nach Live-Flugdaten...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Fehlerprotokoll -->
+    <div id="error-log">Protokoll: System gestartet. Warte auf erste Daten...</div>
 
     <button class="center-btn" onclick="centerMap()">
         🎯 Zentrieren
@@ -174,7 +230,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Konfiguration (Stuttgart Region)
+        // Konfiguration (Region Stuttgart)
         const CONFIG = {
             lat: 48.6913,
             lon: 9.1843
@@ -182,114 +238,149 @@
 
         const radiusNmi = 20; // Umkreis in nautischen Meilen
 
-        // Karte initialisieren mit Dark-Theme Tiles
-        const map = L.map('map', {
-            zoomControl: false
-        }).setView([CONFIG.lat, CONFIG.lon], 10);
+        // Fehlerprotokoll-Helfer
+        function logError(message) {
+            const logDiv = document.getElementById('error-log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.textContent = `[${time}] ${message}\n` + logDiv.textContent;
+            console.error(message);
+        }
+
+        // Karte initialisieren (Dark-Theme)
+        const map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 9);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+            attribution: '&copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
 
-        // Speicher für Marker und Flugspuren (Traces)
         const markers = {};
         const traces = {};
 
         function centerMap() {
-            map.setView([CONFIG.lat, CONFIG.lon], 10);
+            map.setView([CONFIG.lat, CONFIG.lon], 9);
+        }
+
+        // Distanzberechnung in km zwischen zwei Koordinaten
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Erdradius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(1) + " km";
         }
 
         async function fetchFlightData() {
             try {
-                // Abruf über deinen Cloudflare Worker Proxy
                 const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
                 
                 const response = await fetch(workerUrl);
                 if (!response.ok) {
-                    throw new Error(`HTTP Status: ${response.status}`);
+                    throw new Error(`HTTP Fehler! Status: ${response.status}`);
                 }
 
                 const data = await response.json();
                 const flights = data.ac || [];
 
-                updateRadar(flights);
+                updateRadarAndTable(flights);
                 
-                // Status aktualisieren
                 document.getElementById('status-text').textContent = `${flights.length} Flugzeuge`;
-                document.getElementById('status-dot').style.backgroundColor = '#4CAF50'; // Grün bei Erfolg
+                document.getElementById('status-dot').style.backgroundColor = '#4CAF50';
 
             } catch (error) {
-                console.error("Fehler beim Abrufen der Flugdaten:", error);
+                logError(error.message);
                 document.getElementById('status-text').textContent = "Fehler";
-                document.getElementById('status-dot').style.backgroundColor = '#f44336'; // Rot bei Fehler
+                document.getElementById('status-dot').style.backgroundColor = '#f44336';
             }
         }
 
-        function updateRadar(flights) {
+        function updateRadarAndTable(flights) {
             const activeHexes = new Set();
+            const tbody = document.getElementById('flight-table-body');
+            tbody.innerHTML = '';
+
+            if (flights.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #666; padding: 30px;">Keine Flugzeuge im aktuellen Umkreis (${radiusNmi} NM).</td></tr>`;
+            }
 
             flights.forEach(flight => {
-                if (!flight.lat || !flight.lon || !flight.hex) return;
-                
+                if (!flight.hex) return;
                 activeHexes.add(flight.hex);
-                const pos = [flight.lat, flight.lon];
-                const callsign = flight.flight ? flight.flight.trim() : flight.hex;
 
-                // 1. Flugspur (Trace) aktualisieren / erstellen
-                if (!traces[flight.hex]) {
-                    traces[flight.hex] = L.polyline([pos], { 
-                        color: '#2196F3', 
-                        weight: 2, 
-                        opacity: 0.7 
-                    }).addTo(map);
-                } else {
-                    const latlngs = traces[flight.hex].getLatLngs();
-                    latlngs.push(pos);
-                    if (latlngs.length > 30) latlngs.shift(); // Maximal 30 historische Punkte behalten
-                    traces[flight.hex].setLatLngs(latlngs);
+                const callsign = flight.flight ? flight.flight.trim() : flight.hex;
+                const alt = flight.alt_baro ? flight.alt_baro + ' ft' : 'N/A';
+                const speed = flight.gs ? flight.gs + ' kn' : 'N/A';
+                
+                // Distanz berechnen, falls Position vorhanden
+                let dist = 'N/A';
+                if (flight.lat && flight.lon) {
+                    dist = calculateDistance(CONFIG.lat, CONFIG.lon, flight.lat, flight.lon);
                 }
 
-                // 2. Flugzeug-Marker aktualisieren / erstellen
-                const heading = flight.track || 0;
-                const iconHtml = `<div style="transform: rotate(${heading}deg); font-size: 16px; text-align: center; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));">✈️</div>`;
+                // Routen-Fallback (ADS-B liefert oft Routen-Codes oder sie werden dynamisch ergänzt)
+                const routeText = flight.r ? flight.r : "Stuttgart (STR) → Unbekannt";
 
-                if (!markers[flight.hex]) {
-                    const icon = L.divIcon({
-                        className: 'plane-icon',
-                        html: iconHtml,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                    });
+                // Foto-Vorschau (nutzt standardisierte Quellen über Hex/Reg falls verfügbar, sonst Platzhalter)
+                const photoHtml = `<img src="https://planespotters.net/photo/search?reg=${flight.r || ''}" class="plane-thumb" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'25\'><rect width=\'100%\' height=\'100%\' fill=\'%23222\'/><text x=\'50%\' y=\'55%\' fill=\'%23666\' font-size=\'10\' text-anchor=\'middle\' dominant-baseline=\'central\'>Kein</text></svg>';">`;
 
-                    markers[flight.hex] = L.marker(pos, { icon: icon }).addTo(map)
-                        .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${flight.alt_baro || 'N/A'} ft<br><b>Speed:</b> ${flight.gs || 'N/A'} kn`);
-                } else {
-                    markers[flight.hex].setLatLng(pos);
-                    // Icon-Rotation bei Kurswechsel anpassen
-                    markers[flight.hex].setIcon(L.divIcon({
-                        className: 'plane-icon',
-                        html: iconHtml,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                    }));
-                    markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${flight.alt_baro || 'N/A'} ft<br><b>Speed:</b> ${flight.gs || 'N/A'} kn`);
+                // Tabellenzeile hinzufügen
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${callsign}</strong></td>
+                    <td>${photoHtml}</td>
+                    <td>${routeText}</td>
+                    <td>${alt}</td>
+                    <td>${speed}</td>
+                    <td>${dist}</td>
+                `;
+                tbody.appendChild(tr);
+
+                // Karten-Marker & Traces aktualisieren (nur wenn Koordinaten existieren)
+                if (flight.lat && flight.lon) {
+                    const pos = [flight.lat, flight.lon];
+
+                    // Trace (Spur)
+                    if (!traces[flight.hex]) {
+                        traces[flight.hex] = L.polyline([pos], { color: '#2196F3', weight: 2, opacity: 0.7 }).addTo(map);
+                    } else {
+                        const latlngs = traces[flight.hex].getLatLngs();
+                        latlngs.push(pos);
+                        if (latlngs.length > 30) latlngs.shift();
+                        traces[flight.hex].setLatLngs(latlngs);
+                    }
+
+                    // Marker
+                    const heading = flight.track || 0;
+                    const iconHtml = `<div style="transform: rotate(${heading}deg); font-size: 16px; text-align: center; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));">✈️</div>`;
+
+                    if (!markers[flight.hex]) {
+                        const icon = L.divIcon({ className: 'plane-icon', html: iconHtml, iconSize: [24, 24], iconAnchor: [12, 12] });
+                        markers[flight.hex] = L.marker(pos, { icon: icon }).addTo(map)
+                            .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${alt}<br><b>Speed:</b> ${speed}`);
+                    } else {
+                        markers[flight.hex].setLatLng(pos);
+                        markers[flight.hex].setIcon(L.divIcon({ className: 'plane-icon', html: iconHtml, iconSize: [24, 24], iconAnchor: [12, 12] }));
+                        markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${alt}<br><b>Speed:</b> ${speed}`);
+                    }
                 }
             });
 
-            // Veraltete Flugzeuge, die den Radius verlassen haben, von der Karte entfernen
+            // Veraltete Flugzeuge entfernen
             for (const hex in markers) {
                 if (!activeHexes.has(hex)) {
                     map.removeLayer(markers[hex]);
-                    map.removeLayer(traces[hex]);
+                    if (traces[hex]) map.removeLayer(traces[hex]);
                     delete markers[hex];
                     delete traces[hex];
                 }
             }
         }
 
-        // Initialer Abruf und automatisches Intervall alle 10 Sekunden
+        // Initiale Datenabfrage & Intervall
         fetchFlightData();
         setInterval(fetchFlightData, 10000);
     </script>
