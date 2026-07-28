@@ -360,20 +360,27 @@ async function fetchPhoto(hex) {
   }
 }
 
-async function fetchAircraftData() {
+
+  async function fetchAircraftData() {
   const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
 
-  const sources = [
-    {
-      name: 'CodeTabs Proxy (ADSB.lol)',
-      url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
-      parse: (d) => (d.ac || []).map(f => ({ ...f, track: f.track || f.nav_heading || 0 }))
-    },
-    {
-      name: 'AllOrigins Proxy (ADSB.lol)',
-      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.adsb.lol/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`)}`,
-      parse: (d) => (d.ac || []).map(f => ({ ...f, track: f.track || f.nav_heading || 0 }))
-    }
+  // Deine persönliche, ultraschnelle Cloudflare-Worker-URL:
+  const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
+
+  try {
+    const res = await fetch(workerUrl);
+    if (!res.ok) throw new Error(`HTTP Status: ${res.status}`);
+    
+    const data = await res.json();
+    const parsed = (data.ac || []).map(f => ({ ...f, track: f.track || f.nav_heading || 0 }));
+    
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {
+    logError(`Fehler beim Abrufen über Cloudflare: ${e.message}`);
+  }
+  
+  throw new Error("Fehler beim Abrufen der Flugdaten.");
+}
   ];
 
   for (const src of sources) {
