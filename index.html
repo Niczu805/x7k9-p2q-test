@@ -296,7 +296,7 @@
         const routeCache = {};
         const strSoundPlayed = new Set();
 
-        // ICAO-zu-IATA-Zuordnung zur Ermittlung kommerzieller Flugnummern
+        // ICAO-zu-IATA-Zuordnung
         const ICAO_TO_IATA = {
             'SWR': 'LX', 'DLH': 'LH', 'EWG': 'EW', 'TUI': 'X3',
             'RYR': 'FR', 'WZZ': 'W6', 'CFG': 'DE', 'EJU': 'U2',
@@ -379,14 +379,11 @@
         function playRadarPing(isStuttgartLanding = false) {
             const soundEnabled = document.getElementById('soundToggle').checked;
             if (!soundEnabled) return;
-
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
-
                 osc.type = 'sine';
-
                 if (isStuttgartLanding) {
                     osc.frequency.setValueAtTime(1320, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.35);
@@ -400,11 +397,9 @@
                     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
                     osc.stop(audioCtx.currentTime + 0.25);
                 }
-
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
-
             } catch (e) {}
         }
 
@@ -460,15 +455,6 @@
             return `${origStr} - ${destStr}`;
         }
 
-        function parseRouteFromRaw(rawRoute) {
-            if (!rawRoute || typeof rawRoute !== 'string') return null;
-            const parts = rawRoute.split(/[-/]/).map(p => p.trim());
-            if (parts.length === 2 && parts[0] && parts[1]) {
-                return { origin: parts[0], destination: parts[1] };
-            }
-            return null;
-        }
-
         async function fetchRouteInfo(callsign, routeTdId, trElement, hex) {
             if (!callsign || callsign === 'N/A') {
                 applyRouteToUi({ formatted: 'Unbekannt - Unbekannt', isDestStuttgart: false }, routeTdId, trElement, hex);
@@ -477,34 +463,27 @@
 
             const cleanCallsign = callsign.trim().toUpperCase();
 
+            // Cache-Prüfung: Verhindert unnötige API-Calls, selbst bei Fehlschlägen!
             if (routeCache[cleanCallsign]) {
                 applyRouteToUi(routeCache[cleanCallsign], routeTdId, trElement, hex);
                 return;
             }
 
-            // Varianten des Callsigns bilden (z. B. SWR785B -> SWR785 -> LX785)
             const variations = [cleanCallsign];
             const noSuffix = cleanCallsign.replace(/([0-9]+)[A-Z]+$/, '$1');
-            if (noSuffix !== cleanCallsign) {
-                variations.push(noSuffix);
-            }
+            if (noSuffix !== cleanCallsign) variations.push(noSuffix);
 
             const airlineIcao = cleanCallsign.substring(0, 3);
             if (ICAO_TO_IATA[airlineIcao]) {
                 const iataPrefix = ICAO_TO_IATA[airlineIcao];
-                const iataCallsign = iataPrefix + cleanCallsign.substring(3);
-                variations.push(iataCallsign);
-                
-                const iataNoSuffix = iataPrefix + noSuffix.substring(3);
-                if (iataNoSuffix !== iataCallsign && !variations.includes(iataNoSuffix)) {
-                    variations.push(iataNoSuffix);
-                }
+                variations.push(iataPrefix + cleanCallsign.substring(3));
+                if (noSuffix !== cleanCallsign) variations.push(iataPrefix + noSuffix.substring(3));
             }
 
             let origin = null;
             let destination = null;
 
-            // 1. ADSB.lol HEX-Abfrage
+            // 1. ADSB.lol HEX-Abfrage (Ausschließlich r_origin und r_destination prüfen)
             if (hex) {
                 try {
                     const resHex = await fetch(`https://api.adsb.lol/v2/hex/${hex}`);
@@ -514,13 +493,6 @@
                             const ac = dataHex.ac[0];
                             if (ac.r_origin) origin = ac.r_origin;
                             if (ac.r_destination) destination = ac.r_destination;
-                            if (!origin && !destination && ac.r) {
-                                const parsed = parseRouteFromRaw(ac.r);
-                                if (parsed) {
-                                    origin = parsed.origin;
-                                    destination = parsed.destination;
-                                }
-                            }
                         }
                     }
                 } catch (e) {}
@@ -562,7 +534,7 @@
                 }
             }
 
-            // 4. Airplanes.live HEX-Abfrage
+            // 4. Airplanes.live HEX-Abfrage (Ebenfalls NUR r_origin und r_destination)
             if ((!origin || !destination) && hex) {
                 try {
                     const resAp = await fetch(`https://api.airplanes.live/v2/hex/${hex}`);
@@ -572,13 +544,6 @@
                             const ac = dataAp.ac[0];
                             if (!origin && ac.r_origin) origin = ac.r_origin;
                             if (!destination && ac.r_destination) destination = ac.r_destination;
-                            if (!origin && !destination && ac.r) {
-                                const parsed = parseRouteFromRaw(ac.r);
-                                if (parsed) {
-                                    origin = parsed.origin;
-                                    destination = parsed.destination;
-                                }
-                            }
                         }
                     }
                 } catch (e) {}
@@ -595,6 +560,7 @@
                 isDestStuttgart: isDestStuttgart
             };
 
+            // Ergebnis cachen (auch wenn es "Unbekannt - Unbekannt" ist), um 420-Fehler zu vermeiden
             routeCache[cleanCallsign] = routeObj;
             applyRouteToUi(routeObj, routeTdId, trElement, hex);
         }
@@ -645,6 +611,7 @@
                 
                 const response = await fetch(workerUrl);
                 if (!response.ok) {
+                    if (response.status === 420) throw new Error("HTTP Fehler 420: Zu viele Anfragen (Rate Limit).");
                     throw new Error(`HTTP Fehler! Status: ${response.status}`);
                 }
 
@@ -763,8 +730,11 @@
             }
         }
 
+        // Initiale Abfrage
         fetchFlightData();
-        setInterval(fetchFlightData, 3000);
+        
+        // Intervall auf 10 Sekunden (5000ms) erhöht, um Rate Limits (420) zu verhindern
+        setInterval(fetchFlightData, 5000);
     </script>
 </body>
 </html>
