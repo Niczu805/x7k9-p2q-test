@@ -360,11 +360,8 @@ async function fetchPhoto(hex) {
   }
 }
 
-
-  async function fetchAircraftData() {
+async function fetchAircraftData() {
   const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
-
-  // Deine persönliche, ultraschnelle Cloudflare-Worker-URL:
   const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
 
   try {
@@ -379,22 +376,6 @@ async function fetchPhoto(hex) {
     logError(`Fehler beim Abrufen über Cloudflare: ${e.message}`);
   }
   
-  throw new Error("Fehler beim Abrufen der Flugdaten.");
-}
-  ];
-
-  for (const src of sources) {
-    try {
-      const res = await fetch(src.url);
-      if (res.ok) {
-        const data = await res.json();
-        const parsed = src.parse(data);
-        if (Array.isArray(parsed)) return parsed;
-      } else {
-        logError(`${src.name} HTTP Status: ${res.status}`);
-      }
-    } catch (e) { logError(`Fehler bei ${src.name}: ${e.message}`); }
-  }
   throw new Error("Fehler beim Abrufen der Flugdaten.");
 }
 
