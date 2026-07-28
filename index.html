@@ -295,8 +295,8 @@
             lon: 9.1663
         };
 
-        // 2.7 Nautische Meilen = ca. 5 km Radius
-        const radiusNmi = 2.7; 
+        // 5.4 Nautische Meilen = ca. 10 km Radius
+        const radiusNmi = 5.4; 
         const photoCache = {};
 
         const AIRPORT_CITIES = {
@@ -307,15 +307,29 @@
             'HAM': 'Hamburg', 'EDDH': 'Hamburg',
             'DUS': 'Düsseldorf', 'EDDL': 'Düsseldorf',
             'CGN': 'Köln/Bonn', 'EDDK': 'Köln/Bonn',
+            'NRN': 'Weeze', 'EDLV': 'Weeze',
+            'HAJ': 'Hannover', 'EDDV': 'Hannover',
+            'NUE': 'Nürnberg', 'EDDN': 'Nürnberg',
+            'FMO': 'Münster/Osnabrück', 'EDDG': 'Münster/Osnabrück',
             'ZRH': 'Zürich', 'LSZH': 'Zürich',
             'VIE': 'Wien', 'LOWW': 'Wien',
-            'LHR': 'London', 'EGLL': 'London',
+            'LHR': 'London Heathrow', 'EGLL': 'London Heathrow',
+            'LGW': 'London Gatwick', 'EGKK': 'London Gatwick',
+            'STN': 'London Stansted', 'EGSS': 'London Stansted',
             'CDG': 'Paris', 'LFPG': 'Paris',
             'AMS': 'Amsterdam', 'EHAM': 'Amsterdam',
             'PMI': 'Palma de Mallorca', 'LEPA': 'Palma de Mallorca',
             'BCN': 'Barcelona', 'LEBL': 'Barcelona',
             'MAD': 'Madrid', 'LEMD': 'Madrid',
-            'AYT': 'Antalya', 'LTAI': 'Antalya'
+            'AGP': 'Málaga', 'LEMG': 'Málaga',
+            'ALC': 'Alicante', 'LEAL': 'Alicante',
+            'AYT': 'Antalya', 'LTAI': 'Antalya',
+            'IST': 'Istanbul', 'LTFM': 'Istanbul',
+            'SAW': 'Istanbul Sabiha Gökçen', 'LTFJ': 'Istanbul Sabiha Gökçen',
+            'HER': 'Heraklion/Kreta', 'LGIR': 'Heraklion/Kreta',
+            'RHO': 'Rhodos', 'LGRP': 'Rhodos',
+            'ATH': 'Athen', 'LGAV': 'Athen',
+            'CFU': 'Korfu', 'LGKR': 'Korfu'
         };
 
         function toggleErrorLog() {
@@ -331,8 +345,8 @@
             console.error(message);
         }
 
-        // Zoomstufe 13 ist ideal für einen 5 km Ausschnitt
-        const map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 13);
+        // Zoomstufe 12 passt ideal für 10 km Ausschnitt
+        const map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 12);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; CARTO',
@@ -344,7 +358,7 @@
         const traces = {};
 
         function centerMap() {
-            map.setView([CONFIG.lat, CONFIG.lon], 13);
+            map.setView([CONFIG.lat, CONFIG.lon], 12);
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -446,7 +460,7 @@
             tbody.innerHTML = '';
 
             if (flights.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #666; padding: 30px;">Keine Flugzeuge im aktuellen Umkreis (5 km).</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #666; padding: 30px;">Keine Flugzeuge im aktuellen Umkreis (10 km).</td></tr>`;
             }
 
             flights.forEach(flight => {
@@ -454,7 +468,19 @@
                 activeHexes.add(flight.hex);
 
                 const callsign = flight.flight ? flight.flight.trim() : flight.hex;
-                const alt = flight.alt_baro ? flight.alt_baro + ' ft' : 'N/A';
+                
+                // Höhe in Metern umrechnen (1 ft = 0.3048 m)
+                let alt = 'N/A';
+                if (flight.alt_baro !== undefined && flight.alt_baro !== null) {
+                    if (typeof flight.alt_baro === 'number') {
+                        alt = Math.round(flight.alt_baro * 0.3048) + ' m';
+                    } else if (flight.alt_baro === 'ground') {
+                        alt = 'Boden';
+                    } else {
+                        alt = flight.alt_baro;
+                    }
+                }
+
                 const speedKmh = flight.gs ? Math.round(flight.gs * 1.852) + ' km/h' : 'N/A';
                 
                 let dist = 'N/A';
