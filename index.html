@@ -362,7 +362,8 @@ async function fetchPhoto(hex) {
 
 async function fetchAircraftData() {
   const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
- const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/lat/${CONFIG.lat}/lon/${CONFIG.lon}/${radiusNmi}`;
+ // Beispiel für den korrekten Aufruf in deiner index.html:
+const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
 
   try {
     const res = await fetch(workerUrl);
