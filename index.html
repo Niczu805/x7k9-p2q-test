@@ -73,7 +73,7 @@
         input:checked + .slider { background-color: #2196F3; }
         input:checked + .slider:before { transform: translateX(16px); }
         
-        /* Kombinierter Status & Fehlerprotokoll Button */
+        /* Status Button */
         .status-btn {
             display: flex;
             align-items: center;
@@ -169,7 +169,7 @@
         }
         tr:hover { background-color: #181818; }
 
-        /* Hellere Hervorhebung für Flüge mit Ziel Stuttgart */
+        /* Highlight Stuttgart */
         tr.highlight-str {
             background-color: rgba(255, 215, 0, 0.25) !important;
             border-left: 4px solid #ffd700;
@@ -187,7 +187,7 @@
             display: block;
         }
 
-        /* Fehlerprotokoll Fenster */
+        /* Fehlerprotokoll Modal */
         #error-log-modal {
             display: none;
             position: fixed;
@@ -218,10 +218,7 @@
             font-size: 12px;
             font-weight: bold;
         }
-        .close-log {
-            cursor: pointer;
-            color: #888;
-        }
+        .close-log { cursor: pointer; color: #888; }
         .close-log:hover { color: #fff; }
     </style>
 </head>
@@ -276,7 +273,7 @@
         </div>
     </div>
 
-    <!-- Verstecktes Fehlerprotokoll Modal -->
+    <!-- Fehlerprotokoll Modal -->
     <div id="error-log-modal">
         <div class="log-header">
             <span>Fehlerprotokoll</span>
@@ -294,11 +291,28 @@
             lon: 9.1663
         };
 
-        // 5.4 Nautische Meilen = ca. 10 km Radius
         const radiusNmi = 5.4; 
         const photoCache = {};
         const routeCache = {};
         const strSoundPlayed = new Set();
+
+        const AIRLINES = {
+            'SWR': 'Swiss',
+            'TUI': 'TUI fly',
+            'DLH': 'Lufthansa',
+            'EWG': 'Eurowings',
+            'BER': 'Air Berlin',
+            'RYR': 'Ryanair',
+            'WZZ': 'Wizz Air',
+            'CFG': 'Condor',
+            'EJU': 'easyJet',
+            'EZY': 'easyJet',
+            'KLM': 'KLM',
+            'AFR': 'Air France',
+            'BAW': 'British Airways',
+            'THY': 'Turkish Airlines',
+            'AEE': 'Aegean'
+        };
 
         const AIRPORT_CITIES = {
             'STR': 'Stuttgart', 'EDDS': 'Stuttgart',
@@ -308,52 +322,20 @@
             'HAM': 'Hamburg', 'EDDH': 'Hamburg',
             'DUS': 'Düsseldorf', 'EDDL': 'Düsseldorf',
             'CGN': 'Köln/Bonn', 'EDDK': 'Köln/Bonn',
-            'NRN': 'Weeze', 'EDLV': 'Weeze',
-            'HAJ': 'Hannover', 'EDDV': 'Hannover',
-            'NUE': 'Nürnberg', 'EDDN': 'Nürnberg',
-            'FMO': 'Münster/Osnabrück', 'EDDG': 'Münster/Osnabrück',
-            'LEJ': 'Leipzig/Halle', 'EDDP': 'Leipzig/Halle',
-            'FDH': 'Friedrichshafen', 'EDNY': 'Friedrichshafen',
             'ZRH': 'Zürich', 'LSZH': 'Zürich',
-            'BSL': 'Basel', 'LFSB': 'Basel', 'EAP': 'Basel',
-            'GVA': 'Genf', 'LSGG': 'Genf',
+            'BSL': 'Basel', 'LFSB': 'Basel',
             'VIE': 'Wien', 'LOWW': 'Wien',
-            'PRG': 'Prag', 'LKPR': 'Prag',
-            'BRU': 'Brüssel', 'EBBR': 'Brüssel',
-            'AMS': 'Amsterdam', 'EHAM': 'Amsterdam',
-            'CDG': 'Paris', 'LFPG': 'Paris',
-            'ORY': 'Paris Orly', 'LFPO': 'Paris Orly',
-            'LHR': 'London Heathrow', 'EGLL': 'London Heathrow',
-            'LGW': 'London Gatwick', 'EGKK': 'London Gatwick',
-            'STN': 'London Stansted', 'EGSS': 'London Stansted',
             'PMI': 'Palma de Mallorca', 'LEPA': 'Palma de Mallorca',
             'BCN': 'Barcelona', 'LEBL': 'Barcelona',
             'MAD': 'Madrid', 'LEMD': 'Madrid',
             'AGP': 'Málaga', 'LEMG': 'Málaga',
-            'ALC': 'Alicante', 'LEAL': 'Alicante',
-            'LIS': 'Lissabon', 'LPPT': 'Lissabon',
-            'FAO': 'Faro', 'LPFR': 'Faro',
-            'FCO': 'Rom', 'LIRF': 'Rom',
-            'MXP': 'Mailand', 'LIMC': 'Mailand',
-            'BGY': 'Mailand Bergamo', 'LIME': 'Mailand Bergamo',
-            'VCE': 'Venedig', 'LIPZ': 'Venedig',
-            'NAP': 'Neapel', 'LIRN': 'Neapel',
-            'ATH': 'Athen', 'LGAV': 'Athen',
-            'HER': 'Heraklion/Kreta', 'LGIR': 'Heraklion/Kreta',
-            'RHO': 'Rhodos', 'LGRP': 'Rhodos',
-            'CFU': 'Korfu', 'LGKR': 'Korfu',
             'AYT': 'Antalya', 'LTAI': 'Antalya',
-            'IST': 'Istanbul', 'LTFM': 'Istanbul',
-            'SAW': 'Istanbul Sabiha Gökçen', 'LTFJ': 'Istanbul Sabiha Gökçen',
-            'ADB': 'Izmir', 'LTBJ': 'Izmir',
-            'DLM': 'Dalaman', 'LTBS': 'Dalaman',
-            'BUD': 'Budapest', 'LHBP': 'Budapest',
-            'WAW': 'Warschau', 'EPWA': 'Warschau',
-            'CPH': 'Kopenhagen', 'EKCH': 'Kopenhagen',
-            'OSL': 'Oslo', 'ENGM': 'Oslo',
-            'ARN': 'Stockholm', 'ESSA': 'Stockholm',
-            'HEL': 'Helsinki', 'EFHK': 'Helsinki',
-            'DUB': 'Dublin', 'EIDW': 'Dublin'
+            'HER': 'Heraklion', 'LGIR': 'Heraklion',
+            'ATH': 'Athen', 'LGAV': 'Athen',
+            'LHR': 'London Heathrow', 'EGLL': 'London Heathrow',
+            'STN': 'London Stansted', 'EGSS': 'London Stansted',
+            'CDG': 'Paris', 'LFPG': 'Paris',
+            'AMS': 'Amsterdam', 'EHAM': 'Amsterdam'
         };
 
         function playRadarPing(isStuttgartLanding = false) {
@@ -385,9 +367,7 @@
                 gain.connect(audioCtx.destination);
                 osc.start();
 
-            } catch (e) {
-                // AudioContext eventuell blockiert
-            }
+            } catch (e) {}
         }
 
         function toggleErrorLog() {
@@ -436,8 +416,13 @@
             return city ? `${cleanCode} (${city})` : cleanCode;
         }
 
+        // Hilfsfunktion zum Beseitigen von ATC-Endbuchstaben (z. B. SWR785B -> SWR785)
+        function cleanCallsignNumber(callsign) {
+            return callsign.replace(/([0-9]+)[A-Z]+$/, '$1');
+        }
+
         async function fetchRouteInfo(callsign, routeTdId, trElement, hex) {
-            if (!callsign || callsign === 'N/A' || callsign.length < 2) return;
+            if (!callsign || callsign === 'N/A') return;
 
             const cleanCallsign = callsign.trim().toUpperCase();
 
@@ -446,62 +431,60 @@
                 return;
             }
 
-            // Quelle 1: HexDB via CORS-Proxy
-            try {
-                const res = await fetch(`https://corsproxy.io/?https://hexdb.io/api/v1/route/callsign/${encodeURIComponent(cleanCallsign)}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.origin && data.destination) {
-                        const originStr = formatAirport(data.origin);
-                        const destStr = formatAirport(data.destination);
-                        const destClean = data.destination.trim().toUpperCase();
-                        
-                        const isDestStuttgart = (destClean === 'STR' || destClean === 'EDDS' || destStr.includes('Stuttgart'));
+            // 1. Versuche Abfrage über ADSB.lol HEX API
+            if (hex) {
+                try {
+                    const resHex = await fetch(`https://api.adsb.lol/v2/hex/${hex}`);
+                    if (resHex.ok) {
+                        const dataHex = await resHex.json();
+                        if (dataHex && dataHex.ac && dataHex.ac.length > 0) {
+                            const ac = dataHex.ac[0];
+                            if (ac.r_origin && ac.r_destination) {
+                                const orig = formatAirport(ac.r_origin);
+                                const dest = formatAirport(ac.r_destination);
+                                const isDestStuttgart = ac.r_destination.toUpperCase().includes('STR') || ac.r_destination.toUpperCase().includes('EDDS');
 
-                        const routeObj = {
-                            formatted: `${originStr} → ${destStr}`,
-                            isDestStuttgart: isDestStuttgart
-                        };
-
-                        routeCache[cleanCallsign] = routeObj;
-                        applyRouteToUi(routeObj, routeTdId, trElement, hex);
-                        return;
+                                const routeObj = { formatted: `${orig} → ${dest}`, isDestStuttgart };
+                                routeCache[cleanCallsign] = routeObj;
+                                applyRouteToUi(routeObj, routeTdId, trElement, hex);
+                                return;
+                            }
+                        }
                     }
-                }
-            } catch (e) {
-                // Weiter zu Quelle 2
+                } catch (e) {}
             }
 
-            // Quelle 2: ADSB.lol API
-            try {
-                const resLol = await fetch(`https://api.adsb.lol/v2/callsign/${encodeURIComponent(cleanCallsign)}`);
-                if (resLol.ok) {
-                    const dataLol = await resLol.json();
-                    if (dataLol && dataLol.route) {
-                        const orig = dataLol.route._origin || dataLol.route.origin;
-                        const dest = dataLol.route._destination || dataLol.route.destination;
-                        if (orig && dest) {
-                            const originStr = formatAirport(orig);
-                            const destStr = formatAirport(dest);
-                            const destClean = dest.trim().toUpperCase();
+            // 2. Versuche Abfrage über HexDB mit exaktem Callsign
+            const candidates = [cleanCallsign, cleanCallsignNumber(cleanCallsign)];
+            
+            for (const c of candidates) {
+                try {
+                    const res = await fetch(`https://hexdb.io/api/v1/route/callsign/${encodeURIComponent(c)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.origin && data.destination) {
+                            const originStr = formatAirport(data.origin);
+                            const destStr = formatAirport(data.destination);
+                            const destClean = data.destination.trim().toUpperCase();
                             const isDestStuttgart = (destClean === 'STR' || destClean === 'EDDS' || destStr.includes('Stuttgart'));
 
-                            const routeObj = {
-                                formatted: `${originStr} → ${destStr}`,
-                                isDestStuttgart: isDestStuttgart
-                            };
-
+                            const routeObj = { formatted: `${originStr} → ${destStr}`, isDestStuttgart };
                             routeCache[cleanCallsign] = routeObj;
                             applyRouteToUi(routeObj, routeTdId, trElement, hex);
                             return;
                         }
                     }
-                }
-            } catch (e) {
-                // Beide Quellen fehlgeschlagen
+                } catch (e) {}
             }
 
-            routeCache[cleanCallsign] = { formatted: 'Unbekannt', isDestStuttgart: false };
+            // 3. Fallback: Airline erkennen (z. B. SWR -> Swiss)
+            const airlineCode = cleanCallsign.substring(0, 3);
+            let fallbackText = 'Unbekannt';
+            if (AIRLINES[airlineCode]) {
+                fallbackText = `Flug (${AIRLINES[airlineCode]})`;
+            }
+
+            routeCache[cleanCallsign] = { formatted: fallbackText, isDestStuttgart: false };
             applyRouteToUi(routeCache[cleanCallsign], routeTdId, trElement, hex);
         }
 
@@ -539,9 +522,7 @@
                         return;
                     }
                 }
-            } catch (e) {
-                // Fallback
-            }
+            } catch (e) {}
 
             photoCache[hex] = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='45' height='30'><rect width='100%' height='100%' fill='%23222'/><text x='50%' y='55%' fill='%23666' font-size='9' text-anchor='middle' dominant-baseline='central'>Kein</text></svg>";
             img.src = photoCache[hex];
@@ -566,7 +547,6 @@
 
             } catch (error) {
                 logError(error.message);
-                
                 document.getElementById('status-text').textContent = "Fehler";
                 document.getElementById('status-dot').style.backgroundColor = '#f44336';
             }
