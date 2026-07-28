@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flugzeugradar - Komplettansicht</title>
+    <title>Flugzeugradar</title>
     
     <!-- Leaflet CSS für die Karte -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -30,6 +30,7 @@
             align-items: center;
             border-bottom: 1px solid #2a2a2a;
             height: 50px;
+            box-sizing: border-box;
             z-index: 1000;
         }
         .header-title {
@@ -43,7 +44,7 @@
         .header-controls {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 15px;
             font-size: 13px;
         }
         .control-item {
@@ -89,7 +90,19 @@
             display: inline-block;
         }
 
-        /* Layout: Split-Screen (Oben Karte, Unten Tabelle) */
+        /* Button für Fehlerprotokoll oben rechts */
+        .log-toggle-btn {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            color: #ff5555;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .log-toggle-btn:hover { background-color: #333; }
+
+        /* Main Container */
         .main-container {
             display: flex;
             flex-direction: column;
@@ -97,13 +110,41 @@
             overflow: hidden;
         }
 
-        #map {
+        /* Karten-Wrapper */
+        .map-wrapper {
+            position: relative;
             height: 45vh;
             width: 100%;
-            background-color: #121212;
             border-bottom: 2px solid #2a2a2a;
         }
 
+        #map {
+            height: 100%;
+            width: 100%;
+            background-color: #121212;
+        }
+
+        /* Zentrieren Button */
+        .center-btn {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background-color: #2a2a2a;
+            color: white;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            z-index: 1000;
+        }
+        .center-btn:hover { background-color: #333; }
+
+        /* Tabelle */
         .table-container {
             flex: 1;
             overflow-y: auto;
@@ -131,7 +172,15 @@
         }
         tr:hover { background-color: #181818; }
 
-        /* Flugzeug-Thumbnail in Tabelle */
+        /* Hervorhebung für Flüge mit Ziel Stuttgart */
+        tr.highlight-str {
+            background-color: rgba(255, 215, 0, 0.12) !important;
+            border-left: 4px solid #ffd700;
+        }
+        tr.highlight-str:hover {
+            background-color: rgba(255, 215, 0, 0.2) !important;
+        }
+
         .plane-thumb {
             width: 40px;
             height: 25px;
@@ -140,45 +189,49 @@
             background: #333;
         }
 
-        /* Fehlerprotokoll / Konsole unten */
-        #error-log {
+        /* Fehlerprotokoll Fenster */
+        #error-log-modal {
+            display: none;
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            width: 360px;
+            max-height: 250px;
             background-color: #0b0b0b;
+            border: 1px solid #333;
+            border-radius: 8px;
             color: #ff5555;
             font-family: monospace;
             font-size: 11px;
-            padding: 6px 15px;
-            border-top: 1px solid #222;
-            max-height: 60px;
+            padding: 12px;
             overflow-y: auto;
             white-space: pre-wrap;
-        }
-
-        /* Zentrieren Button */
-        .center-btn {
-            position: fixed;
-            bottom: 80px;
-            right: 20px;
-            background-color: #2a2a2a;
-            color: white;
-            border: 1px solid #444;
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
             z-index: 2000;
         }
-        .center-btn:hover { background-color: #333; }
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #222;
+            color: #aaa;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .close-log {
+            cursor: pointer;
+            color: #888;
+        }
+        .close-log:hover { color: #fff; }
     </style>
 </head>
 <body>
 
     <header>
         <div class="header-title">
-            <span>✈️</span> Flugzeugradar (Stuttgart & Umgebung)
+            <span>✈️</span> Flugzeugradar
         </div>
         <div class="header-controls">
             <div class="control-item">
@@ -188,6 +241,7 @@
                     <span class="slider"></span>
                 </label>
             </div>
+            <button class="log-toggle-btn" onclick="toggleErrorLog()">⚠️ Fehlerprotokoll</button>
             <div class="status-badge">
                 <span class="dot" id="status-dot"></span>
                 <span id="status-text">Lade...</span>
@@ -196,8 +250,13 @@
     </header>
 
     <div class="main-container">
-        <!-- Karte -->
-        <div id="map"></div>
+        <!-- Karten-Wrapper mit Zentrierknopf -->
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <button class="center-btn" onclick="centerMap()">
+                🎯 Zentrieren
+            </button>
+        </div>
 
         <!-- Tabelle mit allen Spalten -->
         <div class="table-container">
@@ -219,35 +278,62 @@
         </div>
     </div>
 
-    <!-- Fehlerprotokoll -->
-    <div id="error-log">Protokoll: System gestartet. Warte auf erste Daten...</div>
-
-    <button class="center-btn" onclick="centerMap()">
-        🎯 Zentrieren
-    </button>
+    <!-- Verstecktes Fehlerprotokoll Modal -->
+    <div id="error-log-modal">
+        <div class="log-header">
+            <span>Fehlerprotokoll</span>
+            <span class="close-log" onclick="toggleErrorLog()">✕</span>
+        </div>
+        <div id="error-log-content">Keine Fehler vorhanden.</div>
+    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Konfiguration (Region Stuttgart)
+        // Koordinaten für Leinfelden-Echterdingen
         const CONFIG = {
-            lat: 48.6913,
-            lon: 9.1843
+            lat: 48.6912,
+            lon: 9.1663
         };
 
-        const radiusNmi = 20; // Umkreis in nautischen Meilen
+        const radiusNmi = 20;
 
-        // Fehlerprotokoll-Helfer
+        // Zuordnung von IATA/ICAO Codes zu Städten
+        const AIRPORT_CITIES = {
+            'STR': 'Stuttgart', 'EDDS': 'Stuttgart',
+            'FRA': 'Frankfurt', 'EDDF': 'Frankfurt',
+            'MUC': 'München', 'EDDM': 'München',
+            'BER': 'Berlin', 'EDDB': 'Berlin',
+            'HAM': 'Hamburg', 'EDDH': 'Hamburg',
+            'DUS': 'Düsseldorf', 'EDDL': 'Düsseldorf',
+            'CGN': 'Köln/Bonn', 'EDDK': 'Köln/Bonn',
+            'ZRH': 'Zürich', 'LSZH': 'Zürich',
+            'VIE': 'Wien', 'LOWW': 'Wien',
+            'LHR': 'London', 'EGLL': 'London',
+            'CDG': 'Paris', 'LFPG': 'Paris',
+            'AMS': 'Amsterdam', 'EHAM': 'Amsterdam',
+            'PMI': 'Palma de Mallorca', 'LEPA': 'Palma de Mallorca',
+            'BCN': 'Barcelona', 'LEBL': 'Barcelona',
+            'MAD': 'Madrid', 'LEMD': 'Madrid',
+            'AYT': 'Antalya', 'LTAI': 'Antalya'
+        };
+
+        function toggleErrorLog() {
+            const modal = document.getElementById('error-log-modal');
+            modal.style.display = (modal.style.display === 'block') ? 'none' : 'block';
+        }
+
         function logError(message) {
-            const logDiv = document.getElementById('error-log');
+            const logDiv = document.getElementById('error-log-content');
             const time = new Date().toLocaleTimeString();
+            if (logDiv.textContent === "Keine Fehler vorhanden.") logDiv.textContent = "";
             logDiv.textContent = `[${time}] ${message}\n` + logDiv.textContent;
             console.error(message);
         }
 
-        // Karte initialisieren (Dark-Theme)
-        const map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 9);
+        // Karte initialisieren
+        const map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 11);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; CARTO',
@@ -259,12 +345,11 @@
         const traces = {};
 
         function centerMap() {
-            map.setView([CONFIG.lat, CONFIG.lon], 9);
+            map.setView([CONFIG.lat, CONFIG.lon], 11);
         }
 
-        // Distanzberechnung in km zwischen zwei Koordinaten
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Erdradius in km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -272,6 +357,37 @@
                       Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             return (R * c).toFixed(1) + " km";
+        }
+
+        // Verarbeitet die Routenangabe und ergänzt Städtenamen
+        function processRoute(routeRaw) {
+            if (!routeRaw || routeRaw === 'Unbekannt') {
+                return { formatted: 'Unbekannt', isDestStuttgart: false };
+            }
+
+            const parts = routeRaw.split(/[\s\->\-]+/).filter(Boolean);
+            
+            if (parts.length >= 2) {
+                const origin = parts[0].toUpperCase();
+                const dest = parts[parts.length - 1].toUpperCase();
+
+                const originCity = AIRPORT_CITIES[origin] ? ` (${AIRPORT_CITIES[origin]})` : '';
+                const destCity = AIRPORT_CITIES[dest] ? ` (${AIRPORT_CITIES[dest]})` : '';
+
+                const formatted = `${origin}${originCity} → ${dest}${destCity}`;
+                const isDestStuttgart = (dest === 'STR' || dest === 'EDDS' || destCity.includes('Stuttgart'));
+
+                return { formatted, isDestStuttgart };
+            } else if (parts.length === 1) {
+                const code = parts[0].toUpperCase();
+                const city = AIRPORT_CITIES[code] ? ` (${AIRPORT_CITIES[code]})` : '';
+                return { 
+                    formatted: `${code}${city}`, 
+                    isDestStuttgart: (code === 'STR' || code === 'EDDS' || city.includes('Stuttgart')) 
+                };
+            }
+
+            return { formatted: routeRaw, isDestStuttgart: false };
         }
 
         async function fetchFlightData() {
@@ -313,37 +429,37 @@
 
                 const callsign = flight.flight ? flight.flight.trim() : flight.hex;
                 const alt = flight.alt_baro ? flight.alt_baro + ' ft' : 'N/A';
-                const speed = flight.gs ? flight.gs + ' kn' : 'N/A';
+                const speedKmh = flight.gs ? Math.round(flight.gs * 1.852) + ' km/h' : 'N/A';
                 
-                // Distanz berechnen, falls Position vorhanden
                 let dist = 'N/A';
                 if (flight.lat && flight.lon) {
                     dist = calculateDistance(CONFIG.lat, CONFIG.lon, flight.lat, flight.lon);
                 }
 
-                // Routen-Fallback (ADS-B liefert oft Routen-Codes oder sie werden dynamisch ergänzt)
-                const routeText = flight.r ? flight.r : "Stuttgart (STR) → Unbekannt";
+                // Routenverarbeitung & Stuttgart-Erkennung
+                const routeInfo = processRoute(flight.r);
 
-                // Foto-Vorschau (nutzt standardisierte Quellen über Hex/Reg falls verfügbar, sonst Platzhalter)
                 const photoHtml = `<img src="https://planespotters.net/photo/search?reg=${flight.r || ''}" class="plane-thumb" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'25\'><rect width=\'100%\' height=\'100%\' fill=\'%23222\'/><text x=\'50%\' y=\'55%\' fill=\'%23666\' font-size=\'10\' text-anchor=\'middle\' dominant-baseline=\'central\'>Kein</text></svg>';">`;
 
-                // Tabellenzeile hinzufügen
                 const tr = document.createElement('tr');
+                if (routeInfo.isDestStuttgart) {
+                    tr.classList.add('highlight-str');
+                }
+
                 tr.innerHTML = `
                     <td><strong>${callsign}</strong></td>
                     <td>${photoHtml}</td>
-                    <td>${routeText}</td>
+                    <td>${routeInfo.formatted}</td>
                     <td>${alt}</td>
-                    <td>${speed}</td>
+                    <td>${speedKmh}</td>
                     <td>${dist}</td>
                 `;
                 tbody.appendChild(tr);
 
-                // Karten-Marker & Traces aktualisieren (nur wenn Koordinaten existieren)
+                // Karten-Marker & Traces
                 if (flight.lat && flight.lon) {
                     const pos = [flight.lat, flight.lon];
 
-                    // Trace (Spur)
                     if (!traces[flight.hex]) {
                         traces[flight.hex] = L.polyline([pos], { color: '#2196F3', weight: 2, opacity: 0.7 }).addTo(map);
                     } else {
@@ -353,23 +469,21 @@
                         traces[flight.hex].setLatLngs(latlngs);
                     }
 
-                    // Marker
                     const heading = flight.track || 0;
                     const iconHtml = `<div style="transform: rotate(${heading}deg); font-size: 16px; text-align: center; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));">✈️</div>`;
 
                     if (!markers[flight.hex]) {
                         const icon = L.divIcon({ className: 'plane-icon', html: iconHtml, iconSize: [24, 24], iconAnchor: [12, 12] });
                         markers[flight.hex] = L.marker(pos, { icon: icon }).addTo(map)
-                            .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${alt}<br><b>Speed:</b> ${speed}`);
+                            .bindPopup(`<b>Callsign:</b> ${callsign}<br><b>Route:</b> ${routeInfo.formatted}<br><b>Höhe:</b> ${alt}<br><b>Geschw.:</b> ${speedKmh}`);
                     } else {
                         markers[flight.hex].setLatLng(pos);
                         markers[flight.hex].setIcon(L.divIcon({ className: 'plane-icon', html: iconHtml, iconSize: [24, 24], iconAnchor: [12, 12] }));
-                        markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Höhe:</b> ${alt}<br><b>Speed:</b> ${speed}`);
+                        markers[flight.hex].setPopupContent(`<b>Callsign:</b> ${callsign}<br><b>Route:</b> ${routeInfo.formatted}<br><b>Höhe:</b> ${alt}<br><b>Geschw.:</b> ${speedKmh}`);
                     }
                 }
             });
 
-            // Veraltete Flugzeuge entfernen
             for (const hex in markers) {
                 if (!activeHexes.has(hex)) {
                     map.removeLayer(markers[hex]);
@@ -380,9 +494,8 @@
             }
         }
 
-        // Initiale Datenabfrage & Intervall
         fetchFlightData();
-        setInterval(fetchFlightData, 10000);
+        setInterval(fetchFlightData, 3000);
     </script>
 </body>
 </html>
