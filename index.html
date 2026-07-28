@@ -296,22 +296,13 @@
         const routeCache = {};
         const strSoundPlayed = new Set();
 
-        const AIRLINES = {
-            'SWR': 'Swiss',
-            'TUI': 'TUI fly',
-            'DLH': 'Lufthansa',
-            'EWG': 'Eurowings',
-            'BER': 'Air Berlin',
-            'RYR': 'Ryanair',
-            'WZZ': 'Wizz Air',
-            'CFG': 'Condor',
-            'EJU': 'easyJet',
-            'EZY': 'easyJet',
-            'KLM': 'KLM',
-            'AFR': 'Air France',
-            'BAW': 'British Airways',
-            'THY': 'Turkish Airlines',
-            'AEE': 'Aegean'
+        // ICAO-zu-IATA-Zuordnung zur Ermittlung kommerzieller Flugnummern
+        const ICAO_TO_IATA = {
+            'SWR': 'LX', 'DLH': 'LH', 'EWG': 'EW', 'TUI': 'X3',
+            'RYR': 'FR', 'WZZ': 'W6', 'CFG': 'DE', 'EJU': 'U2',
+            'EZY': 'U2', 'KLM': 'KL', 'AFR': 'AF', 'BAW': 'BA',
+            'THY': 'TK', 'AEE': 'A3', 'TAP': 'TP', 'SAS': 'SK',
+            'FIN': 'AY', 'IBE': 'IB', 'AEA': 'UX', 'VLG': 'VY'
         };
 
         const AIRPORT_CITIES = {
@@ -322,20 +313,67 @@
             'HAM': 'Hamburg', 'EDDH': 'Hamburg',
             'DUS': 'Düsseldorf', 'EDDL': 'Düsseldorf',
             'CGN': 'Köln/Bonn', 'EDDK': 'Köln/Bonn',
+            'HAJ': 'Hannover', 'EDDV': 'Hannover',
+            'NUE': 'Nürnberg', 'EDDN': 'Nürnberg',
+            'LEJ': 'Leipzig/Halle', 'EDDP': 'Leipzig/Halle',
+            'FMO': 'Münster/Osnabrück', 'EDDG': 'Münster/Osnabrück',
+            'DTM': 'Dortmund', 'EDLW': 'Dortmund',
+            'NRN': 'Weeze', 'EDLV': 'Weeze',
+            'FKB': 'Karlsruhe/Baden-Baden', 'EDSB': 'Karlsruhe/Baden-Baden',
+            'FDH': 'Friedrichshafen', 'EDNY': 'Friedrichshafen',
             'ZRH': 'Zürich', 'LSZH': 'Zürich',
-            'BSL': 'Basel', 'LFSB': 'Basel',
+            'BSL': 'Basel', 'LFSB': 'Basel', 'EAP': 'Basel',
+            'GVA': 'Genf', 'LSGG': 'Genf',
             'VIE': 'Wien', 'LOWW': 'Wien',
+            'SZG': 'Salzburg', 'LOWS': 'Salzburg',
+            'INN': 'Innsbruck', 'LOWI': 'Innsbruck',
+            'PRG': 'Prag', 'LKPR': 'Prag',
+            'BRU': 'Brüssel', 'EBBR': 'Brüssel',
+            'AMS': 'Amsterdam', 'EHAM': 'Amsterdam',
+            'CDG': 'Paris', 'LFPG': 'Paris',
+            'ORY': 'Paris Orly', 'LFPO': 'Paris Orly',
+            'NCE': 'Nizza', 'LFMN': 'Nizza',
+            'LHR': 'London Heathrow', 'EGLL': 'London Heathrow',
+            'LGW': 'London Gatwick', 'EGKK': 'London Gatwick',
+            'STN': 'London Stansted', 'EGSS': 'London Stansted',
+            'LTN': 'London Luton', 'EGGW': 'London Luton',
+            'MAN': 'Manchester', 'EGCC': 'Manchester',
+            'DUB': 'Dublin', 'EIDW': 'Dublin',
             'PMI': 'Palma de Mallorca', 'LEPA': 'Palma de Mallorca',
             'BCN': 'Barcelona', 'LEBL': 'Barcelona',
             'MAD': 'Madrid', 'LEMD': 'Madrid',
             'AGP': 'Málaga', 'LEMG': 'Málaga',
-            'AYT': 'Antalya', 'LTAI': 'Antalya',
-            'HER': 'Heraklion', 'LGIR': 'Heraklion',
+            'ALC': 'Alicante', 'LEAL': 'Alicante',
+            'IBZ': 'Ibiza', 'LEIB': 'Ibiza',
+            'TFS': 'Teneriffa Süd', 'GCTS': 'Teneriffa Süd',
+            'LPA': 'Gran Canaria', 'GCLP': 'Gran Canaria',
+            'LIS': 'Lissabon', 'LPPT': 'Lissabon',
+            'FAO': 'Faro', 'LPFR': 'Faro',
+            'OPO': 'Porto', 'LPPR': 'Porto',
+            'FCO': 'Rom', 'LIRF': 'Rom',
+            'MXP': 'Mailand', 'LIMC': 'Mailand',
+            'BGY': 'Mailand Bergamo', 'LIME': 'Mailand Bergamo',
+            'VCE': 'Venedig', 'LIPZ': 'Venedig',
+            'NAP': 'Neapel', 'LIRN': 'Neapel',
             'ATH': 'Athen', 'LGAV': 'Athen',
-            'LHR': 'London Heathrow', 'EGLL': 'London Heathrow',
-            'STN': 'London Stansted', 'EGSS': 'London Stansted',
-            'CDG': 'Paris', 'LFPG': 'Paris',
-            'AMS': 'Amsterdam', 'EHAM': 'Amsterdam'
+            'HER': 'Heraklion', 'LGIR': 'Heraklion',
+            'RHO': 'Rhodos', 'LGRP': 'Rhodos',
+            'CFU': 'Korfu', 'LGKR': 'Korfu',
+            'KGS': 'Kos', 'LGKO': 'Kos',
+            'AYT': 'Antalya', 'LTAI': 'Antalya',
+            'IST': 'Istanbul', 'LTFM': 'Istanbul',
+            'SAW': 'Istanbul Sabiha Gökçen', 'LTFJ': 'Istanbul Sabiha Gökçen',
+            'ADB': 'Izmir', 'LTBJ': 'Izmir',
+            'DLM': 'Dalaman', 'LTBS': 'Dalaman',
+            'BUD': 'Budapest', 'LHBP': 'Budapest',
+            'WAW': 'Warschau', 'EPWA': 'Warschau',
+            'CPH': 'Kopenhagen', 'EKCH': 'Kopenhagen',
+            'OSL': 'Oslo', 'ENGM': 'Oslo',
+            'ARN': 'Stockholm', 'ESSA': 'Stockholm',
+            'HEL': 'Helsinki', 'EFHK': 'Helsinki',
+            'DXB': 'Dubai', 'OMDB': 'Dubai',
+            'DOH': 'Doha', 'OTHH': 'Doha',
+            'HRG': 'Hurghada', 'HEGN': 'Hurghada'
         };
 
         function playRadarPing(isStuttgartLanding = false) {
@@ -410,19 +448,32 @@
         }
 
         function formatAirport(code) {
-            if (!code) return '';
+            if (!code || code === 'N/A' || code === '???') return 'Unbekannt';
             const cleanCode = code.trim().toUpperCase();
             const city = AIRPORT_CITIES[cleanCode];
             return city ? `${cleanCode} (${city})` : cleanCode;
         }
 
-        // Hilfsfunktion zum Beseitigen von ATC-Endbuchstaben (z. B. SWR785B -> SWR785)
-        function cleanCallsignNumber(callsign) {
-            return callsign.replace(/([0-9]+)[A-Z]+$/, '$1');
+        function buildRouteString(origin, destination) {
+            const origStr = formatAirport(origin);
+            const destStr = formatAirport(destination);
+            return `${origStr} - ${destStr}`;
+        }
+
+        function parseRouteFromRaw(rawRoute) {
+            if (!rawRoute || typeof rawRoute !== 'string') return null;
+            const parts = rawRoute.split(/[-/]/).map(p => p.trim());
+            if (parts.length === 2 && parts[0] && parts[1]) {
+                return { origin: parts[0], destination: parts[1] };
+            }
+            return null;
         }
 
         async function fetchRouteInfo(callsign, routeTdId, trElement, hex) {
-            if (!callsign || callsign === 'N/A') return;
+            if (!callsign || callsign === 'N/A') {
+                applyRouteToUi({ formatted: 'Unbekannt - Unbekannt', isDestStuttgart: false }, routeTdId, trElement, hex);
+                return;
+            }
 
             const cleanCallsign = callsign.trim().toUpperCase();
 
@@ -431,7 +482,29 @@
                 return;
             }
 
-            // 1. Versuche Abfrage über ADSB.lol HEX API
+            // Varianten des Callsigns bilden (z. B. SWR785B -> SWR785 -> LX785)
+            const variations = [cleanCallsign];
+            const noSuffix = cleanCallsign.replace(/([0-9]+)[A-Z]+$/, '$1');
+            if (noSuffix !== cleanCallsign) {
+                variations.push(noSuffix);
+            }
+
+            const airlineIcao = cleanCallsign.substring(0, 3);
+            if (ICAO_TO_IATA[airlineIcao]) {
+                const iataPrefix = ICAO_TO_IATA[airlineIcao];
+                const iataCallsign = iataPrefix + cleanCallsign.substring(3);
+                variations.push(iataCallsign);
+                
+                const iataNoSuffix = iataPrefix + noSuffix.substring(3);
+                if (iataNoSuffix !== iataCallsign && !variations.includes(iataNoSuffix)) {
+                    variations.push(iataNoSuffix);
+                }
+            }
+
+            let origin = null;
+            let destination = null;
+
+            // 1. ADSB.lol HEX-Abfrage
             if (hex) {
                 try {
                     const resHex = await fetch(`https://api.adsb.lol/v2/hex/${hex}`);
@@ -439,53 +512,91 @@
                         const dataHex = await resHex.json();
                         if (dataHex && dataHex.ac && dataHex.ac.length > 0) {
                             const ac = dataHex.ac[0];
-                            if (ac.r_origin && ac.r_destination) {
-                                const orig = formatAirport(ac.r_origin);
-                                const dest = formatAirport(ac.r_destination);
-                                const isDestStuttgart = ac.r_destination.toUpperCase().includes('STR') || ac.r_destination.toUpperCase().includes('EDDS');
-
-                                const routeObj = { formatted: `${orig} → ${dest}`, isDestStuttgart };
-                                routeCache[cleanCallsign] = routeObj;
-                                applyRouteToUi(routeObj, routeTdId, trElement, hex);
-                                return;
+                            if (ac.r_origin) origin = ac.r_origin;
+                            if (ac.r_destination) destination = ac.r_destination;
+                            if (!origin && !destination && ac.r) {
+                                const parsed = parseRouteFromRaw(ac.r);
+                                if (parsed) {
+                                    origin = parsed.origin;
+                                    destination = parsed.destination;
+                                }
                             }
                         }
                     }
                 } catch (e) {}
             }
 
-            // 2. Versuche Abfrage über HexDB mit exaktem Callsign
-            const candidates = [cleanCallsign, cleanCallsignNumber(cleanCallsign)];
-            
-            for (const c of candidates) {
-                try {
-                    const res = await fetch(`https://hexdb.io/api/v1/route/callsign/${encodeURIComponent(c)}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data && data.origin && data.destination) {
-                            const originStr = formatAirport(data.origin);
-                            const destStr = formatAirport(data.destination);
-                            const destClean = data.destination.trim().toUpperCase();
-                            const isDestStuttgart = (destClean === 'STR' || destClean === 'EDDS' || destStr.includes('Stuttgart'));
+            // 2. ADSB.lol Callsign-Abfrage
+            if (!origin || !destination) {
+                for (const v of variations) {
+                    try {
+                        const res = await fetch(`https://api.adsb.lol/v2/callsign/${encodeURIComponent(v)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && data.route) {
+                                const orig = data.route._origin || data.route.origin;
+                                const dest = data.route._destination || data.route.destination;
+                                if (orig && !origin) origin = orig;
+                                if (dest && !destination) destination = dest;
+                                if (origin && destination) break;
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
 
-                            const routeObj = { formatted: `${originStr} → ${destStr}`, isDestStuttgart };
-                            routeCache[cleanCallsign] = routeObj;
-                            applyRouteToUi(routeObj, routeTdId, trElement, hex);
-                            return;
+            // 3. HexDB-Abfrage
+            if (!origin || !destination) {
+                for (const v of variations) {
+                    try {
+                        const res = await fetch(`https://hexdb.io/api/v1/route/callsign/${encodeURIComponent(v)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && data.origin && data.destination) {
+                                if (!origin) origin = data.origin;
+                                if (!destination) destination = data.destination;
+                                if (origin && destination) break;
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            // 4. Airplanes.live HEX-Abfrage
+            if ((!origin || !destination) && hex) {
+                try {
+                    const resAp = await fetch(`https://api.airplanes.live/v2/hex/${hex}`);
+                    if (resAp.ok) {
+                        const dataAp = await resAp.json();
+                        if (dataAp && dataAp.ac && dataAp.ac.length > 0) {
+                            const ac = dataAp.ac[0];
+                            if (!origin && ac.r_origin) origin = ac.r_origin;
+                            if (!destination && ac.r_destination) destination = ac.r_destination;
+                            if (!origin && !destination && ac.r) {
+                                const parsed = parseRouteFromRaw(ac.r);
+                                if (parsed) {
+                                    origin = parsed.origin;
+                                    destination = parsed.destination;
+                                }
+                            }
                         }
                     }
                 } catch (e) {}
             }
 
-            // 3. Fallback: Airline erkennen (z. B. SWR -> Swiss)
-            const airlineCode = cleanCallsign.substring(0, 3);
-            let fallbackText = 'Unbekannt';
-            if (AIRLINES[airlineCode]) {
-                fallbackText = `Flug (${AIRLINES[airlineCode]})`;
-            }
+            const formattedRoute = buildRouteString(origin, destination);
+            
+            const destClean = (destination || '').trim().toUpperCase();
+            const destFormatted = formatAirport(destination);
+            const isDestStuttgart = (destClean === 'STR' || destClean === 'EDDS' || destFormatted.includes('Stuttgart'));
 
-            routeCache[cleanCallsign] = { formatted: fallbackText, isDestStuttgart: false };
-            applyRouteToUi(routeCache[cleanCallsign], routeTdId, trElement, hex);
+            const routeObj = {
+                formatted: formattedRoute,
+                isDestStuttgart: isDestStuttgart
+            };
+
+            routeCache[cleanCallsign] = routeObj;
+            applyRouteToUi(routeObj, routeTdId, trElement, hex);
         }
 
         function applyRouteToUi(routeObj, routeTdId, trElement, hex) {
