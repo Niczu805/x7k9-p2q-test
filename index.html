@@ -11,53 +11,156 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            overflow-x: hidden;
         }
         header {
-            background-color: #1f1f1f;
-            padding: 15px 20px;
+            background-color: #1a1a1a;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid #2a2a2a;
         }
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 13px;
+        }
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #bbb;
+        }
+        /* Switch Toggle */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #444;
+            transition: .3s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(16px);
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dot {
+            height: 8px;
+            width: 8px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 0;
         }
         th, td {
             padding: 12px 20px;
             text-align: left;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid #1f1f1f;
+            font-size: 13px;
         }
         th {
-            color: #888;
-            font-size: 13px;
+            color: #777;
+            font-size: 11px;
             text-transform: uppercase;
+            background-color: #161616;
+            letter-spacing: 0.5px;
         }
-        #status-container {
-            padding: 40px;
+        tr:hover {
+            background-color: #181818;
+        }
+        
+        #info-container {
             text-align: center;
-            color: #888;
+            padding: 60px;
+            color: #666;
+            font-size: 14px;
         }
-        .status-badge {
+
+        /* Zentrieren Button */
+        .center-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #2a2a2a;
+            color: white;
+            border: 1px solid #444;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            background: #2a2a2a;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
+            gap: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .center-btn:hover {
+            background-color: #333;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h2 style="margin: 0; font-size: 18px;">✈️ Flugzeugradar</h2>
-        <div class="status-badge">
-            <span id="status-dot" style="color: orange;">●</span> 
-            <span id="status-text">Lade...</span>
+        <div class="header-title">
+            <span>✈️</span> Flugzeugradar
+        </div>
+        <div class="header-controls">
+            <div class="control-item">
+                <span>Ton</span>
+                <label class="switch">
+                    <input type="checkbox" id="soundToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="status-indicator">
+                <span class="dot" id="status-dot"></span>
+                <span id="status-text">Lade...</span>
+            </div>
         </div>
     </header>
 
@@ -77,9 +180,13 @@
         </tbody>
     </table>
 
-    <div id="status-container">
+    <div id="info-container">
         <p id="info-message">Suche nach Live-Flugdaten...</p>
     </div>
+
+    <button class="center-btn" onclick="location.reload()">
+        🎯 Zentrieren
+    </button>
 
     <script>
         // Deine Koordinaten (z.B. Region Stuttgart)
@@ -90,14 +197,9 @@
 
         const radiusNmi = 20; // Umkreis in nautischen Meilen
 
-        function updateStatus(text, color) {
-            document.getElementById('status-text').textContent = text;
-            document.getElementById('status-dot').style.color = color;
-        }
-
         async function fetchFlightData() {
             try {
-                // WICHTIG: Korrekter Endpunkt /v2/point/ statt /v2/lat/
+                // Korrekter Worker-Endpunkt mit /v2/point/
                 const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
                 
                 const response = await fetch(workerUrl);
@@ -110,13 +212,23 @@
                 const flights = data.ac || [];
 
                 renderFlights(flights);
-                updateStatus(`${flights.length} Flugzeuge`, 'limegreen');
-                document.getElementById('info-message').textContent = flights.length === 0 ? "Keine Flugzeuge im aktuellen Umkreis." : "";
+                
+                document.getElementById('status-text').textContent = `${flights.length} Flugzeuge`;
+                document.getElementById('status-dot').style.backgroundColor = '#4CAF50';
+                
+                const infoMsg = document.getElementById('info-message');
+                if (flights.length === 0) {
+                    infoMsg.textContent = "Keine Flugzeuge im aktuellen Umkreis.";
+                    infoMsg.style.display = "block";
+                } else {
+                    infoMsg.style.display = "none";
+                }
 
             } catch (error) {
                 console.error("Fehler beim Abrufen:", error);
-                updateStatus("Fehler", 'red');
-                document.getElementById('info-message').textContent = `Fehler beim Abrufen über Cloudflare: HTTP Status: 404`;
+                document.getElementById('status-text').textContent = "Fehler";
+                document.getElementById('status-dot').style.backgroundColor = '#f44336';
+                document.getElementById('info-message').textContent = "Fehler beim Laden der Live-Flugdaten.";
             }
         }
 
@@ -127,7 +239,7 @@
             flights.forEach(flight => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${flight.flight ? flight.flight.trim() : (flight.hex || 'Unbekannt')}</td>
+                    <td><strong>${flight.flight ? flight.flight.trim() : (flight.hex || 'Unbekannt')}</strong></td>
                     <td>-</td>
                     <td>-</td>
                     <td>${flight.alt_baro ? flight.alt_baro + ' ft' : 'N/A'}</td>
@@ -138,7 +250,7 @@
             });
         }
 
-        // Initialer Aufruf und Intervall alle 10 Sekunden
+        // Initial abrufen und alle 10 Sekunden aktualisieren
         fetchFlightData();
         setInterval(fetchFlightData, 10000);
     </script>
