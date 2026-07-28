@@ -1,566 +1,146 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Flugzeugradar</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0b0f14;
-    color: #e6edf3;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  header {
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #11161d;
-    border-bottom: 1px solid #232b35;
-    flex-shrink: 0;
-    gap: 12px;
-  }
-  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
-  header .controls { display: flex; align-items: center; gap: 12px; }
-  header .status { font-size: 11px; color: #8b98a5; display: flex; gap: 8px; align-items: center; }
-  
-  .status-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: transparent; border: none; color: inherit; font: inherit;
-    cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background-color 0.2s;
-  }
-  .status-btn:hover { background-color: #1c2229; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
-  .dot.loading { background: #d29922; }
-  .dot.error { background: #f85149; }
-
-  .audio-toggle { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b98a5; cursor: pointer; user-select: none; }
-  .switch { position: relative; display: inline-block; width: 32px; height: 18px; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider {
-    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-    background-color: #21262d; border: 1px solid #30363d; transition: .3s; border-radius: 18px;
-  }
-  .slider:before {
-    position: absolute; content: ""; height: 12px; width: 12px; left: 2px; bottom: 2px;
-    background-color: #8b98a5; transition: .3s; border-radius: 50%;
-  }
-  input:checked + .slider { background-color: #238636; border-color: #2ea043; }
-  input:checked + .slider:before { transform: translateX(14px); background-color: #fff; }
-
-  main { flex: 1; display: flex; min-height: 0; flex-direction: column; }
-  #map-wrapper { position: relative; height: 35vh; width: 100%; }
-  #map { height: 100%; width: 100%; background: #11161d; }
-  
-  #recenterBtn {
-    position: absolute; bottom: 12px; right: 12px; z-index: 1000;
-    background: #161b22; border: 1px solid #30363d; color: #e6edf3;
-    padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    font-size: 11px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    display: flex; align-items: center; gap: 4px; transition: background 0.2s;
-  }
-  #recenterBtn:hover { background: #21262d; }
-
-  #list { flex: 1; overflow-y: auto; background: #0d1117; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #1c2229; white-space: nowrap; vertical-align: middle; }
-  th { position: sticky; top: 0; background: #11161d; color: #8b98a5; font-size: 11px; text-transform: uppercase; z-index: 10; }
-  tr { transition: background-color 0.2s; cursor: pointer; }
-  tr:hover { background: #161b22; }
-  tr.landing-str { background: #14202e; }
-  tr.landing-str:hover { background: #1a2a3d; }
-
-  .route { color: #58a6ff; }
-  .route .arrow { color: #566270; margin: 0 4px; }
-  .muted { color: #6e7681; }
-  .empty { padding: 20px; text-align: center; color: #8b98a5; font-size: 13px; }
-
-  .plane-marker { background: transparent !important; border: none !important; }
-  .plane-thumb {
-    width: 44px; height: 30px; object-fit: cover; border-radius: 4px;
-    border: 1px solid #30363d; display: block; background: #161b22;
-  }
-
-  .modal-backdrop {
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.7); z-index: 9999; align-items: center; justify-content: center; padding: 16px;
-  }
-  .modal-backdrop.active { display: flex; }
-  .modal {
-    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-    max-width: 600px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  }
-  .modal-header { padding: 12px 16px; border-bottom: 1px solid #21262d; display: flex; justify-content: space-between; align-items: center; }
-  .modal-header h3 { font-size: 14px; color: #f0f6fc; }
-  .modal-close { background: transparent; border: none; color: #8b98a5; font-size: 18px; cursor: pointer; }
-  .modal-body {
-    padding: 16px; overflow-y: auto; font-family: monospace; font-size: 11px;
-    color: #f85149; white-space: pre-wrap; word-break: break-all; background: #0d1117;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flugzeugradar</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #1f1f1f;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid #222;
+        }
+        th {
+            color: #888;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        #status-container {
+            padding: 40px;
+            text-align: center;
+            color: #888;
+        }
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #2a2a2a;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
 
-<header>
-  <h1>✈️ Flugzeugradar</h1>
-  <div class="controls">
-    <label class="audio-toggle" title="Ton bei Anflug auf Stuttgart (< 5.000 ft)">
-      <span>🔔 Ton</span>
-      <div class="switch">
-        <input type="checkbox" id="audioToggle">
-        <span class="slider"></span>
-      </div>
-    </label>
-    <div class="status">
-      <button class="status-btn" id="statusBtn" title="Klicken für Status / Fehlerprotokoll">
-        <span class="dot" id="statusDot"></span>
-        <span id="statusText">Lade…</span>
-      </button>
-      <span id="countText">0 Flugzeuge</span>
-    </div>
-  </div>
-</header>
+    <header>
+        <h2 style="margin: 0; font-size: 18px;">✈️ Flugzeugradar</h2>
+        <div class="status-badge">
+            <span id="status-dot" style="color: orange;">●</span> 
+            <span id="status-text">Lade...</span>
+        </div>
+    </header>
 
-<main>
-  <div id="map-wrapper">
-    <div id="map"></div>
-    <button id="recenterBtn" title="Auf Heimatformat zentrieren">🎯 Zentrieren</button>
-  </div>
-  <div id="list">
     <table>
-      <thead>
-        <tr>
-          <th>Callsign</th>
-          <th>Foto</th>
-          <th>Route</th>
-          <th>Höhe</th>
-          <th>Geschw.</th>
-          <th>Distanz</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
+        <thead>
+            <tr>
+                <th>CALLSIGN</th>
+                <th>FOTO</th>
+                <th>ROUTE</th>
+                <th>HÖHE</th>
+                <th>GESCHW.</th>
+                <th>DISTANZ</th>
+            </tr>
+        </thead>
+        <tbody id="flight-table-body">
+            <!-- Dynamische Einträge -->
+        </tbody>
     </table>
-    <div class="empty" id="emptyMsg">Suche nach Live-Flugdaten...</div>
-  </div>
-</main>
 
-<div class="modal-backdrop" id="errorModal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>📋 Diagnose & Fehlerprotokoll</h3>
-      <button class="modal-close" id="modalCloseBtn">&times;</button>
+    <div id="status-container">
+        <p id="info-message">Suche nach Live-Flugdaten...</p>
     </div>
-    <div class="modal-body" id="errorLog">Keine Fehler vorhanden.</div>
-  </div>
-</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const CONFIG = {
-  lat: 48.6913,
-  lon: 9.1843,
-  radiusKm: 20,
-  refreshSeconds: 5
-};
+    <script>
+        // Deine Koordinaten (z.B. Region Stuttgart)
+        const CONFIG = {
+            lat: 48.6913,
+            lon: 9.1843
+        };
 
-const routeCache = new Map();
-const photoCache = new Map();
-const historyPositions = new Map();
-const polylines = new Map();        
-const planeStates = new Map();      
-const alertedPlanes = new Set();    
-const errorLogs = [];
-let lastSuccessfulFlights = null;
-let consecutiveErrors = 0;
-let audioCtx = null;
-let map = null;
-const markers = new Map();
+        const radiusNmi = 20; // Umkreis in nautischen Meilen
 
-function logError(msg) {
-  const timestamp = new Date().toLocaleTimeString('de-DE');
-  errorLogs.unshift(`[${timestamp}] ${msg}`);
-  if (errorLogs.length > 20) errorLogs.pop();
-  const logElem = document.getElementById('errorLog');
-  if (logElem) logElem.textContent = errorLogs.join('\n\n');
-}
-
-function setStatus(state, text) {
-  const dot = document.getElementById('statusDot');
-  const t = document.getElementById('statusText');
-  if (dot) dot.className = 'dot' + (state === 'ok' ? '' : ' ' + state);
-  if (t) t.textContent = text;
-}
-
-function playGong() {
-  const toggle = document.getElementById('audioToggle');
-  if (!toggle || !toggle.checked) return;
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(293.66, audioCtx.currentTime + 1.2);
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 1.2);
-  } catch (e) { logError("Audio-Wiedergabefehler: " + e.message); }
-}
-
-document.getElementById('statusBtn').addEventListener('click', () => document.getElementById('errorModal').classList.add('active'));
-document.getElementById('modalCloseBtn').addEventListener('click', () => document.getElementById('errorModal').classList.remove('active'));
-document.getElementById('errorModal').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('errorModal')) document.getElementById('errorModal').classList.remove('active');
-});
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function createPlaneIcon(heading) {
-  const h = typeof heading === 'number' ? heading : 0;
-  return L.divIcon({
-    className: 'plane-marker',
-    html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="#58a6ff" style="transform: rotate(${h}deg); filter: drop-shadow(0 0 3px rgba(0,0,0,0.9)); display: block;"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
-  });
-}
-
-function animateLoop() {
-  const now = performance.now();
-
-  for (const [hex, state] of planeStates) {
-    if (state.altFt === 0) continue;
-
-    const elapsed = now - state.startTime;
-    const progress = Math.min(elapsed / state.duration, 1.0);
-
-    let trackDiff = (state.targetTrack - state.startTrack + 540) % 360 - 180;
-    const currentTrack = state.startTrack + trackDiff * progress;
-
-    const currentLat = state.startLat + (state.targetLat - state.startLat) * progress;
-    const currentLon = state.startLon + (state.targetLon - state.startLon) * progress;
-
-    if (markers.has(hex)) {
-      const m = markers.get(hex);
-      m.setLatLng([currentLat, currentLon]);
-      m.setIcon(createPlaneIcon(currentTrack));
-    }
-
-    const baseTrail = historyPositions.get(hex) || [];
-    if (baseTrail.length > 0) {
-      const dynamicTrail = [...baseTrail, [currentLat, currentLon]];
-      if (polylines.has(hex)) {
-        polylines.get(hex).setLatLngs(dynamicTrail);
-      } else {
-        const line = L.polyline(dynamicTrail, {
-          color: '#58a6ff',
-          weight: 2,
-          opacity: 0.6,
-          dashArray: '4, 4'
-        }).addTo(map);
-        polylines.set(hex, line);
-      }
-    }
-  }
-
-  requestAnimationFrame(animateLoop);
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    setStatus('loading', 'Aktualisiere Live-Daten…');
-    refresh();
-  }
-});
-
-window.addEventListener('DOMContentLoaded', () => {
-  try {
-    if (window.L) {
-      map = L.map('map', { zoomControl: false }).setView([CONFIG.lat, CONFIG.lon], 10);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-      L.marker([CONFIG.lat, CONFIG.lon]).addTo(map).bindPopup('Standort');
-    }
-  } catch(e) { logError("Karten-Initialisierungsfehler: " + e.message); }
-
-  document.getElementById('recenterBtn').addEventListener('click', () => {
-    if (map) map.setView([CONFIG.lat, CONFIG.lon], 10);
-  });
-  
-  refresh();
-  setInterval(refresh, CONFIG.refreshSeconds * 1000);
-  requestAnimationFrame(animateLoop);
-});
-
-async function fetchRoute(callsign) {
-  const cs = callsign.trim();
-  if (!cs) return null;
-  if (routeCache.has(cs)) return routeCache.get(cs);
-  try {
-    const res = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);
-    if (!res.ok) { routeCache.set(cs, null); return null; }
-    const data = await res.json();
-    const fr = data && data.response && data.response.flightroute;
-    if (!fr) { routeCache.set(cs, null); return null; }
-    
-    const formatAirport = (ap) => {
-      if (!ap) return null;
-      const code = ap.iata_code || ap.icao_code || '';
-      const city = ap.municipality || ap.name || '';
-      return (code && city) ? `${code} (${city})` : (code || city || null);
-    };
-
-    const result = {
-      origin: formatAirport(fr.origin),
-      destination: formatAirport(fr.destination),
-      destCode: fr.destination ? (fr.destination.iata_code || fr.destination.icao_code) : ''
-    };
-    routeCache.set(cs, result);
-    return result;
-  } catch (e) {
-    routeCache.set(cs, null);
-    return null;
-  }
-}
-
-async function fetchPhoto(hex) {
-  if (!hex) return null;
-  if (photoCache.has(hex)) return photoCache.get(hex);
-  try {
-    const res = await fetch(`https://api.planespotters.net/pub/photos/hex/${hex}`);
-    if (!res.ok) { photoCache.set(hex, null); return null; }
-    const data = await res.json();
-    if (data && data.photos && data.photos.length > 0) {
-      const src = data.photos[0].thumbnail_large ? data.photos[0].thumbnail_large.src : data.photos[0].thumbnail.src;
-      photoCache.set(hex, src);
-      return src;
-    }
-    photoCache.set(hex, null);
-    return null;
-  } catch (e) {
-    photoCache.set(hex, null);
-    return null;
-  }
-}
-
-async function fetchAircraftData() {
-  const radiusNmi = (CONFIG.radiusKm / 1.852).toFixed(1);
- // Beispiel für den korrekten Aufruf in deiner index.html:
-const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
-
-  try {
-    const res = await fetch(workerUrl);
-    if (!res.ok) throw new Error(`HTTP Status: ${res.status}`);
-    
-    const data = await res.json();
-    const parsed = (data.ac || []).map(f => ({ ...f, track: f.track || f.nav_heading || 0 }));
-    
-    if (Array.isArray(parsed)) return parsed;
-  } catch (e) {
-    logError(`Fehler beim Abrufen über Cloudflare: ${e.message}`);
-  }
-  
-  throw new Error("Fehler beim Abrufen der Flugdaten.");
-}
-
-function renderFlights(flights) {
-  if (map) {
-    const seen = new Set();
-    const now = performance.now();
-    const duration = CONFIG.refreshSeconds * 1000;
-
-    for (const f of flights) {
-      seen.add(f.hex);
-      const popupText = `<b>✈️ ${f.callsign || f.hex}</b><br>Höhe: ${f.altFt > 0 ? f.altFt + ' ft' : 'Boden'}<br>Geschw.: ${Math.round(f.speedKt * 1.852)} km/h`;
-
-      if (!markers.has(f.hex)) {
-        const m = L.marker([f.lat, f.lon], { icon: createPlaneIcon(f.track) }).addTo(map).bindPopup(popupText);
-        markers.set(f.hex, m);
-      } else {
-        markers.get(f.hex).setPopupContent(popupText);
-      }
-
-      const existingState = planeStates.get(f.hex);
-      if (existingState) {
-        planeStates.set(f.hex, {
-          startLat: existingState.targetLat,
-          startLon: existingState.targetLon,
-          startTrack: existingState.targetTrack,
-          targetLat: f.lat,
-          targetLon: f.lon,
-          targetTrack: f.track,
-          startTime: now,
-          duration: duration,
-          altFt: f.altFt
-        });
-      } else {
-        planeStates.set(f.hex, {
-          startLat: f.lat, startLon: f.lon, startTrack: f.track,
-          targetLat: f.lat, targetLon: f.lon, targetTrack: f.track,
-          startTime: now, duration: duration, altFt: f.altFt
-        });
-      }
-
-      if (f.altFt === 0) {
-        if (polylines.has(f.hex)) {
-          map.removeLayer(polylines.get(f.hex));
-          polylines.delete(f.hex);
+        function updateStatus(text, color) {
+            document.getElementById('status-text').textContent = text;
+            document.getElementById('status-dot').style.color = color;
         }
-        historyPositions.delete(f.hex);
-      } else {
-        let path = historyPositions.get(f.hex) || [];
-        const lastPoint = path[path.length - 1];
-        if (!lastPoint || lastPoint[0] !== f.lat || lastPoint[1] !== f.lon) {
-          path.push([f.lat, f.lon]);
-          if (path.length > 20) path.shift();
-          historyPositions.set(f.hex, path);
-        }
-      }
-    }
 
-    for (const [hex, m] of markers) {
-      if (!seen.has(hex)) {
-        map.removeLayer(m);
-        markers.delete(hex);
-        if (polylines.has(hex)) {
-          map.removeLayer(polylines.get(hex));
-          polylines.delete(hex);
-        }
-        historyPositions.delete(hex);
-        planeStates.delete(hex);
-        alertedPlanes.delete(hex);
-      }
-    }
-  }
+        async function fetchFlightData() {
+            try {
+                // WICHTIG: Korrekter Endpunkt /v2/point/ statt /v2/lat/
+                const workerUrl = `https://flugradar-proxy.nicolaiwue.workers.dev/v2/point/${CONFIG.lat}/${CONFIG.lon}/${radiusNmi}`;
+                
+                const response = await fetch(workerUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Status: ${response.status}`);
+                }
 
-  const tbody = document.getElementById('tbody');
-  const emptyMsg = document.getElementById('emptyMsg');
-  if (tbody) tbody.innerHTML = '';
-  
-  if (emptyMsg) {
-    emptyMsg.style.display = flights.length === 0 ? 'block' : 'none';
-    if (flights.length === 0) emptyMsg.textContent = 'Kein Flugverkehr im Umkreis erfasst.';
-  }
+                const data = await response.json();
+                const flights = data.ac || [];
 
-  const countElem = document.getElementById('countText');
-  if (countElem) countElem.textContent = `${flights.length} Flugzeuge`;
+                renderFlights(flights);
+                updateStatus(`${flights.length} Flugzeuge`, 'limegreen');
+                document.getElementById('info-message').textContent = flights.length === 0 ? "Keine Flugzeuge im aktuellen Umkreis." : "";
 
-  for (const f of flights) {
-    if (!tbody) break;
-    const tr = document.createElement('tr');
-    const speedKm = Math.round(f.speedKt * 1.852);
-    const altFmt = f.altFt > 0 ? `${f.altFt.toLocaleString('de-DE')} ft` : 'Boden';
-
-    tr.innerHTML = `
-      <td>✈️ ${f.callsign || '<span class="muted">' + f.hex + '</span>'}</td>
-      <td id="photo-${f.hex}"><span class="muted">…</span></td>
-      <td class="route" id="route-${f.hex}"><span class="muted">…</span></td>
-      <td>${altFmt}</td>
-      <td>${speedKm} km/h</td>
-      <td>${f.distKm.toFixed(1)} km</td>
-    `;
-
-    tr.addEventListener('click', () => {
-      if (map && markers.has(f.hex)) {
-        const state = planeStates.get(f.hex);
-        const lat = state ? state.targetLat : f.lat;
-        const lon = state ? state.targetLon : f.lon;
-        map.setView([lat, lon], 12);
-        markers.get(f.hex).openPopup();
-      }
-    });
-
-    tbody.appendChild(tr);
-
-    fetchPhoto(f.hex).then(photoUrl => {
-      const cell = document.getElementById(`photo-${f.hex}`);
-      if (!cell) return;
-      cell.innerHTML = photoUrl ? `<a href="${photoUrl}" target="_blank" rel="noopener"><img src="${photoUrl}" alt="Flugzeug" class="plane-thumb" /></a>` : '<span class="muted">–</span>';
-    });
-
-    if (f.callsign) {
-      fetchRoute(f.callsign).then(route => {
-        const cell = document.getElementById(`route-${f.hex}`);
-        if (!cell) return;
-        if (route && route.origin && route.destination) {
-          cell.innerHTML = `${route.origin}<span class="arrow">→</span>${route.destination}`;
-          
-          const isLandingSTR = route.destCode === 'STR' || (route.destination && route.destination.includes('STR'));
-          if (isLandingSTR) {
-            tr.classList.add('landing-str');
-            if (f.altFt > 0 && f.altFt < 5000 && !alertedPlanes.has(f.hex)) {
-              alertedPlanes.add(f.hex);
-              playGong();
+            } catch (error) {
+                console.error("Fehler beim Abrufen:", error);
+                updateStatus("Fehler", 'red');
+                document.getElementById('info-message').textContent = `Fehler beim Abrufen über Cloudflare: HTTP Status: 404`;
             }
-          }
-        } else {
-          cell.innerHTML = '<span class="muted">k.A.</span>';
         }
-      });
-    } else {
-      const cell = document.getElementById(`route-${f.hex}`);
-      if (cell) cell.innerHTML = '<span class="muted">–</span>';
-    }
-  }
-}
 
-async function refresh() {
-  if (document.hidden) return;
+        function renderFlights(flights) {
+            const tbody = document.getElementById('flight-table-body');
+            tbody.innerHTML = '';
 
-  setStatus('loading', 'Lade Daten…');
-  let acList = null;
-  try {
-    acList = await fetchAircraftData();
-    consecutiveErrors = 0;
-  } catch (e) {
-    consecutiveErrors++;
-    logError(`Fehler bei Abruf: ${e.message}`);
-    if (lastSuccessfulFlights && consecutiveErrors < 3) {
-      setStatus('loading', `Puffere Daten (${consecutiveErrors}/3)…`);
-      renderFlights(lastSuccessfulFlights);
-      return;
-    } else {
-      setStatus('error', 'Verbindungsfehler');
-      return;
-    }
-  }
+            flights.forEach(flight => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${flight.flight ? flight.flight.trim() : (flight.hex || 'Unbekannt')}</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>${flight.alt_baro ? flight.alt_baro + ' ft' : 'N/A'}</td>
+                    <td>${flight.gs ? flight.gs + ' kn' : 'N/A'}</td>
+                    <td>-</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
 
-  const flights = acList
-    .filter(f => f && typeof f.lat === 'number' && typeof f.lon === 'number')
-    .map(f => ({
-      hex: f.hex,
-      callsign: (f.flight || '').trim(),
-      lat: f.lat,
-      lon: f.lon,
-      altFt: (f.alt_baro !== "ground" && typeof f.alt_baro === 'number') ? f.alt_baro : 0,
-      speedKt: typeof f.gs === 'number' ? f.gs : 0,
-      track: typeof f.track === 'number' ? f.track : 0,
-      distKm: haversineKm(CONFIG.lat, CONFIG.lon, f.lat, f.lon)
-    }))
-    .filter(f => f.distKm <= CONFIG.radiusKm)
-    .sort((a, b) => a.distKm - b.distKm);
-
-  lastSuccessfulFlights = flights;
-  renderFlights(flights);
-  setStatus('ok', 'Live: ' + new Date().toLocaleTimeString('de-DE'));
-}
-</script>
+        // Initialer Aufruf und Intervall alle 10 Sekunden
+        fetchFlightData();
+        setInterval(fetchFlightData, 10000);
+    </script>
 </body>
 </html>
